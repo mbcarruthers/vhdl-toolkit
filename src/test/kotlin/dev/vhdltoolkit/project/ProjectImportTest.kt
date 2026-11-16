@@ -280,6 +280,26 @@ class ProjectImportTest {
         assertTrue("vendor paths stay resolvable", toml.contains("unisim_VCOMP.vhd"))
     }
 
+    /**
+     * The reader must not need an IDE. An earlier version reached into the
+     * plugin settings to find Vivado, which made every test here throw a
+     * NullPointerException outside a running application.
+     */
+    @Test
+    fun readerWorksWithoutAnIdeAndWithAnInjectedInstall() {
+        val xpr = writeRealWorldXpr()
+        write("counter4_ud.srcs/sources_1/new/counter4_ud.vhd")
+        write("counter4_ud.srcs/sim_1/new/counter4_ud_tb.vhd")
+        val install = tmp.root.toPath().resolve("Vivado/2022.2")
+        write("Vivado/2022.2/data/vhdl/src/unisims/unisim_VCOMP.vhd")
+
+        var askedFor: String? = "unset"
+        val model = VivadoXprReader.read(xpr) { version -> askedFor = version; install }
+
+        assertEquals("the .xpr version steers the lookup", "2022.2", askedFor)
+        assertTrue("vendor library mapped", model.libraries.any { it.name == "unisim" })
+    }
+
     @Test
     fun missingVivadoInstallIsWarnedAboutNotFatal() {
         val xpr = writeRealWorldXpr()

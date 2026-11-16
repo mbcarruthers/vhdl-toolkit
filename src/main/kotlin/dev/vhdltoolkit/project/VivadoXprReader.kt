@@ -35,7 +35,16 @@ object VivadoXprReader {
     /** Filesets that never hold VHDL worth analysing. */
     private val IGNORED_FILESET_TYPES = setOf("constrs", "constraints", "utils", "blockdiagrams")
 
-    fun read(xpr: Path): LibraryMappingModel {
+    /**
+     * @param findInstall how to locate Vivado for the vendor libraries. The
+     *   default consults only the filesystem and the process environment, so
+     *   the reader stays usable — and testable — without an IDE running. The
+     *   IDE passes a lookup that also honours the plugin's own setting.
+     */
+    fun read(
+        xpr: Path,
+        findInstall: (String?) -> Path? = { version -> VivadoInstall.locate(version) },
+    ): LibraryMappingModel {
         val warnings = ArrayList<ImportWarning>()
         val projectDir = xpr.toAbsolutePath().normalize().parent
             ?: return LibraryMappingModel(emptyList(), source = xpr.name, warnings = warnings)
@@ -107,7 +116,7 @@ object VivadoXprReader {
 
         // Xilinx primitives (BUFG, block RAM, clocking wizard, ...) resolve
         // only if the vendor libraries are mapped too.
-        val install = VivadoLocator.install(VivadoInstall.versionFromXpr(xpr))
+        val install = findInstall(VivadoInstall.versionFromXpr(xpr))
         if (install != null) {
             val vendor = VivadoInstall.vendorLibraries(install)
             libraries.addAll(vendor)

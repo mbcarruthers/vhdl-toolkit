@@ -66,7 +66,9 @@ class VhdlMappingService(private val project: Project) {
     }
 
     fun read(source: Source): LibraryMappingModel = when (source) {
-        is Source.Vivado -> VivadoXprReader.read(source.file)
+        // Inside the IDE, Vivado is located with the plugin setting and the
+        // login-shell environment, neither of which the bare reader can see.
+        is Source.Vivado -> VivadoXprReader.read(source.file) { version -> VivadoLocator.install(version) }
         is Source.Sigasi -> SigasiMappingReader.read(source.file)
     }
 
