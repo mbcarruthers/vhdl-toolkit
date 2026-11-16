@@ -72,9 +72,40 @@ object TclProjectScript {
         return Analysis(
             kind = kind,
             createsProject = createsProject,
-            projectName = CREATE_PROJECT.find(code)?.groupValues?.get(1)?.takeIf { it.isNotBlank() },
+            projectName = projectNameIn(code),
         )
     }
+
+    /**
+     * The project name from `create_project [options] <name> <dir>`.
+     *
+     * Tokenised rather than matched, because options that take an argument
+     * and options that do not look identical: in
+     * `create_project -force -part xc7a35t mydesign ./build` a pattern cannot
+     * tell that `-force` stands alone while `xc7a35t` belongs to `-part`. The
+     * name is the first token that is neither an option nor an option's
+     * argument.
+     */
+    private fun projectNameIn(code: String): String? {
+        val line = CREATE_PROJECT.find(code)?.groupValues?.get(1)?.substringBefore('\n') ?: return null
+
+        val tokens = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        var i = 0
+        while (i < tokens.size) {
+            val token = tokens[i]
+            if (token.startsWith("-")) {
+                i += if (token.lowercase() in OPTIONS_WITH_ARGUMENT) 2 else 1
+                continue
+            }
+            val name = token.trim('"', '{', '}', '\'')
+            // A name built from a variable cannot be known without running it.
+            return name.takeIf { it.isNotBlank() && !it.contains('$') }
+        }
+        return null
+    }
+
+    /** `create_project` options that consume the token after them. */
+    private val OPTIONS_WITH_ARGUMENT = setOf("-part", "-template", "-ip_name")
 
     fun classify(file: Path): Analysis? =
         runCatching { classify(Files.readString(file)) }.getOrNull()
@@ -93,12 +124,8 @@ object TclProjectScript {
             .filterNot { it.trimStart().startsWith("#") }
             .joinToString("\n")
 
-    /**
-     * `create_project [options] <name> <dir>`. The name may be quoted, braced,
-     * or a `$variable` we cannot resolve — hence the optional capture.
-     */
-    private val CREATE_PROJECT =
-        Regex("""\bcreate_project\b(?:\s+-\S+(?:\s+\S+)?)*\s+["{]?([\w.\-]*)["}]?""")
+    /** `create_project` and whatever follows it on that line. */
+    private val CREATE_PROJECT = Regex("""\bcreate_project\b(.*)""")
 
     private val IPX = Regex("""\bipx::\w+""")
     private val CREATE_BD = Regex("""\bcreate_bd_design\b""")
