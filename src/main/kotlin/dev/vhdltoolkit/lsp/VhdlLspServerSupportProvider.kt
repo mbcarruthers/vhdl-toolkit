@@ -53,17 +53,26 @@ private class VhdlLspServerDescriptor(
      * be collapsed. This callback receives the complete set for one file,
      * which is what the analysis needs and what per-highlight filters cannot
      * provide.
+     *
+     * `Lsp4jClient.publishDiagnostics` is final, so the filtering goes into
+     * the notifications handler it delegates to rather than the client.
      */
     override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
-        VhdlLsp4jClient(handler)
+        Lsp4jClient(CascadeFilteringHandler(handler))
 }
 
-private class VhdlLsp4jClient(handler: LspServerNotificationsHandler) : Lsp4jClient(handler) {
+/**
+ * Passes every notification straight through except `publishDiagnostics`,
+ * which is first stripped of errors caused by another error in the same file.
+ */
+private class CascadeFilteringHandler(
+    private val delegate: LspServerNotificationsHandler,
+) : LspServerNotificationsHandler by delegate {
 
     override fun publishDiagnostics(params: PublishDiagnosticsParams) {
         if (VhdlSettings.getInstance().collapseCascadedDiagnostics) {
             params.diagnostics = DiagnosticFiltering.filter(params)
         }
-        super.publishDiagnostics(params)
+        delegate.publishDiagnostics(params)
     }
 }
