@@ -1,0 +1,48 @@
+<idea-plugin>
+    <id>dev.vhdltoolkit.vhdl</id>
+    <name>VHDL Toolkit</name>
+    <vendor>VHDL Toolkit Project</vendor>
+
+    <description><![CDATA[
+        <p>VHDL support for CLion, powered by the open-source
+        <a href="https://github.com/VHDL-LS/rust_hdl">VHDL-LS</a> language server.</p>
+        <ul>
+            <li>Syntax highlighting for <code>.vhd</code> / <code>.vhdl</code> (VHDL-2008 lexing)</li>
+            <li>Live diagnostics, go to definition, find references, completion, hover and rename via VHDL-LS</li>
+            <li>Comment/uncomment with <code>--</code>, parenthesis matching</li>
+            <li>VHDL-LS binary bundled for Linux and Windows x86_64; other platforms use <code>vhdl_ls</code> from PATH</li>
+        </ul>
+        <p>For whole-project analysis, put a <code>vhdl_ls.toml</code> in the project root mapping
+        your libraries; without it, open files are analyzed standalone.</p>
+        <p>Roadmap: smart <code>end</code> completion, Vivado (.xpr) project recognition.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lsp</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+            name="VHDL"
+            implementationClass="dev.vhdltoolkit.VhdlFileType"
+            fieldName="INSTANCE"
+            language="VHDL"
+            extensions="vhd;vhdl"/>
+        <lang.parserDefinition
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.VhdlParserDefinition"/>
+        <lang.syntaxHighlighterFactory
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.highlight.VhdlSyntaxHighlighterFactory"/>
+        <lang.commenter
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.editing.VhdlCommenter"/>
+        <lang.braceMatcher
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.editing.VhdlBraceMatcher"/>
+        <platform.lsp.serverSupportProvider
+            implementation="dev.vhdltoolkit.lsp.VhdlLspServerSupportProvider"/>
+        <notificationGroup
+            id="VHDL Toolkit"
+            displayType="BALLOON"/>
+    </extensions>
+</idea-plugin>
