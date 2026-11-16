@@ -212,7 +212,10 @@ class ProjectImportTest {
             setOf("counter4_ud.vhd", "counter4_ud_tb.vhd"),
             model.libraries.single().files.map { it.fileName.toString() }.toSet(),
         )
-        assertTrue("no spurious warnings on a clean project", model.warnings.isEmpty())
+        // A missing Vivado install is reported (and expected on CI), but
+        // nothing should be wrong with the project's own sources.
+        val aboutProjectSources = model.warnings.filterNot { it.message.contains("unisim") }
+        assertTrue("no warnings about the project itself: $aboutProjectSources", aboutProjectSources.isEmpty())
     }
 
     @Test
