@@ -18,6 +18,8 @@ import com.intellij.openapi.startup.ProjectActivity
 class VhdlProjectStartupActivity : ProjectActivity {
 
     override suspend fun execute(project: Project) {
+        warnAboutStaleHomeConfig(project)
+
         val service = VhdlMappingService.getInstance(project)
         val source = service.detectSource() ?: return
 
@@ -41,6 +43,51 @@ class VhdlProjectStartupActivity : ProjectActivity {
             // Hand-written: leave it alone.
             else -> Unit
         }
+    }
+
+    /**
+     * A home-level config applies to every project, so a stale one reports
+     * missing files that have nothing to do with what is open. The symptom
+     * points at the wrong place entirely, so it is worth saying plainly.
+     */
+    private fun warnAboutStaleHomeConfig(project: Project) {
+        val finding = HomeConfigChecker.check() ?: return
+        if (!finding.isStale) return
+
+        val examples = finding.missingFiles.take(3).joinToString("<br>") { "• $it" }
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("VHDL Toolkit")
+            .createNotification(
+                "Stale ${HomeConfigChecker.FILE_NAME} in your home folder",
+                "VHDL-LS loads <code>${finding.path}</code> for every project, and none of the " +
+                    "${finding.totalFiles} file(s) it lists exist any more:<br>$examples<br><br>" +
+                    "That is why unrelated projects report missing files. It was most likely left " +
+                    "behind by another tool.",
+                NotificationType.WARNING,
+            )
+            .addAction(
+                NotificationAction.createSimpleExpiring("Rename it aside") {
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        val moved = HomeConfigChecker.disable(finding.path)
+                        val group = NotificationGroupManager.getInstance().getNotificationGroup("VHDL Toolkit")
+                        if (moved != null) {
+                            VhdlLspRestarter.restart(project)
+                            group.createNotification(
+                                "Renamed to ${moved.fileName}",
+                                "VHDL-LS no longer loads it. Delete it when you are sure it is not needed.",
+                                NotificationType.INFORMATION,
+                            ).notify(project)
+                        } else {
+                            group.createNotification(
+                                "Could not rename ${HomeConfigChecker.FILE_NAME}",
+                                "Remove or fix <code>${finding.path}</code> by hand.",
+                                NotificationType.WARNING,
+                            ).notify(project)
+                        }
+                    }
+                },
+            )
+            .notify(project)
     }
 
     private fun offer(project: Project, title: String, body: String, source: VhdlMappingService.Source) {

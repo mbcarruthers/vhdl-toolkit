@@ -20,6 +20,8 @@
         to derive <code>vhdl_ls.toml</code> from it — filesets, per-file libraries and the project
         default library included — then keeps it in step as the project file changes. Run it again
         any time from <b>Tools | Sync VHDL Library Mapping</b>.</p>
+        <p>Constraints files (<code>.xdc</code>) are highlighted too: constraint commands,
+        property names, option switches and Tcl substitution.</p>
         <p>Roadmap: smart <code>end</code> completion, vendor libraries (unisim/xpm),
         and taming cascaded diagnostics.</p>
     ]]></description>
@@ -58,6 +60,25 @@
             displayType="BALLOON"/>
         <postStartupActivity
             implementation="dev.vhdltoolkit.project.VhdlProjectStartupActivity"/>
+
+        <!-- Xilinx design constraints (.xdc), which are Tcl. -->
+        <fileType
+            name="XDC"
+            implementationClass="dev.vhdltoolkit.xdc.XdcFileType"
+            fieldName="INSTANCE"
+            language="XDC"
+            extensions="xdc"/>
+        <lang.parserDefinition
+            language="XDC"
+            implementationClass="dev.vhdltoolkit.xdc.XdcParserDefinition"/>
+        <lang.syntaxHighlighterFactory
+            language="XDC"
+            implementationClass="dev.vhdltoolkit.xdc.XdcSyntaxHighlighterFactory"/>
+        <lang.commenter
+            language="XDC"
+            implementationClass="dev.vhdltoolkit.xdc.XdcCommenter"/>
+        <colorSettingsPage
+            implementation="dev.vhdltoolkit.xdc.XdcColorSettingsPage"/>
     </extensions>
 
     <actions>
