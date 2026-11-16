@@ -229,6 +229,70 @@ class ProjectImportTest {
         assertFalse("library name must never be 'work'", toml.contains("work.files"))
     }
 
+    // ------------------------------------------------------ Vivado install
+
+    @Test
+    fun readsVivadoVersionFromTheXprHeader() {
+        val xpr = writeRealWorldXpr()
+        assertEquals("2022.2", VivadoInstall.versionFromXpr(xpr))
+    }
+
+    @Test
+    fun versionIsAbsentWhenTheHeaderCommentIsNot() {
+        val xpr = write("bare.xpr", "<?xml version=\"1.0\"?>\n<Project Version=\"7\"/>")
+        assertEquals(null, VivadoInstall.versionFromXpr(xpr))
+    }
+
+    @Test
+    fun vendorLibrariesAreMappedAndMarkedThirdParty() {
+        val install = tmp.root.toPath().resolve("Vivado/2022.2")
+        write("Vivado/2022.2/data/vhdl/src/unisims/unisim_VCOMP.vhd")
+        write("Vivado/2022.2/data/vhdl/src/unimacro/unimacro_VCOMP.vhd")
+
+        val vendor = VivadoInstall.vendorLibraries(install)
+        assertEquals(setOf("unisim", "unimacro"), vendor.map { it.name }.toSet())
+        assertTrue("vendor code must not be linted", vendor.all { it.isThirdParty })
+    }
+
+    @Test
+    fun missingVendorLibrariesAreSkippedNotReported() {
+        // A WebPACK install legitimately ships only some of them.
+        val install = tmp.root.toPath().resolve("Vivado/2022.2")
+        write("Vivado/2022.2/data/vhdl/src/unisims/unisim_VCOMP.vhd")
+
+        val vendor = VivadoInstall.vendorLibraries(install)
+        assertEquals(listOf("unisim"), vendor.map { it.name })
+    }
+
+    @Test
+    fun vendorLibraryRendersWithThirdPartyFlag() {
+        val install = tmp.root.toPath().resolve("Vivado/2022.2")
+        write("Vivado/2022.2/data/vhdl/src/unisims/unisim_VCOMP.vhd")
+        val model = LibraryMappingModel(
+            libraries = VivadoInstall.vendorLibraries(install),
+            source = "test",
+        )
+        val toml = VhdlLsTomlWriter.render(model, tmp.root.toPath())
+        assertTrue(toml.contains("unisim.is_third_party = true"))
+        assertTrue("vendor paths stay resolvable", toml.contains("unisim_VCOMP.vhd"))
+    }
+
+    @Test
+    fun missingVivadoInstallIsWarnedAboutNotFatal() {
+        val xpr = writeRealWorldXpr()
+        write("counter4_ud.srcs/sources_1/new/counter4_ud.vhd")
+        write("counter4_ud.srcs/sim_1/new/counter4_ud_tb.vhd")
+
+        val model = VivadoXprReader.read(xpr)
+        // The project's own sources are mapped regardless of vendor libraries.
+        assertTrue(model.fileCount >= 2)
+        assertTrue(
+            "the user is told why primitives will not resolve",
+            model.warnings.any { it.message.contains("unisim") } ||
+                model.libraries.any { it.name == "unisim" },
+        )
+    }
+
     // ---------------------------------------------------------------- Sigasi
 
     /** The real mapping file from a Sigasi project. */

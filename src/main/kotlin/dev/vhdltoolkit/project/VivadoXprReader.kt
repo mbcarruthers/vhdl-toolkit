@@ -103,7 +103,26 @@ object VivadoXprReader {
 
         val libraries = byLibrary.map { (name, files) ->
             SourceLibrary(name = name, files = files.distinct())
+        }.toMutableList()
+
+        // Xilinx primitives (BUFG, block RAM, clocking wizard, ...) resolve
+        // only if the vendor libraries are mapped too.
+        val install = VivadoInstall.locate(VivadoInstall.versionFromXpr(xpr))
+        if (install != null) {
+            val vendor = VivadoInstall.vendorLibraries(install)
+            libraries.addAll(vendor)
+            if (vendor.isEmpty()) {
+                warnings.add(ImportWarning("Found Vivado at $install but none of its VHDL vendor libraries."))
+            }
+        } else if (libraries.isNotEmpty()) {
+            warnings.add(
+                ImportWarning(
+                    "No Vivado installation found, so unisim/unimacro/xpm are unmapped and Xilinx " +
+                        "primitives will appear undefined. Set XILINX_VIVADO to fix.",
+                ),
+            )
         }
+
         if (libraries.isEmpty()) {
             warnings.add(ImportWarning("No VHDL sources found. A Verilog-only project needs no VHDL-LS mapping."))
         }
