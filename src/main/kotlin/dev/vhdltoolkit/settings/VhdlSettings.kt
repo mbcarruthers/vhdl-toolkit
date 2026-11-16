@@ -18,6 +18,13 @@ class VhdlSettings : PersistentStateComponent<VhdlSettings> {
      */
     var collapseCascadedDiagnostics: Boolean = true
 
+    /**
+     * Explicit Vivado installation directory. Empty means "work it out":
+     * `XILINX_VIVADO`, then `vivado` on `PATH`, then the usual locations.
+     * Needed because a GUI-launched IDE does not read `.bashrc`.
+     */
+    var vivadoPath: String = ""
+
     override fun getState(): VhdlSettings = this
 
     override fun loadState(state: VhdlSettings) {

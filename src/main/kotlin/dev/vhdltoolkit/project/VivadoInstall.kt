@@ -36,13 +36,42 @@ object VivadoInstall {
      * Finds an install, preferring one matching [preferredVersion] (as written
      * in the `.xpr` header) so a project built against 2022.2 is not analysed
      * against primitives from a different release.
+     *
+     * Search order, most to least authoritative:
+     *  1. [explicitPath], from the plugin's settings
+     *  2. `XILINX_VIVADO`, which `settings64.sh` exports
+     *  3. a `vivado` launcher on `PATH`, also from `settings64.sh`
+     *  4. the usual install locations
+     *
+     * A GUI-launched IDE does not read `.bashrc`, so 2 and 3 only work when
+     * the environment is visible to it — which is why 1 exists.
      */
-    fun locate(preferredVersion: String? = null): Path? {
+    fun locate(
+        preferredVersion: String? = null,
+        explicitPath: String? = null,
+        env: (String) -> String? = { System.getenv(it) },
+    ): Path? {
         val candidates = ArrayList<Path>()
 
-        // An explicit environment pointer wins: it is what the shell running
-        // Vivado would use.
-        System.getenv("XILINX_VIVADO")?.let { candidates.add(Path.of(it)) }
+        explicitPath?.takeIf { it.isNotBlank() }?.let { raw ->
+            runCatching { normalize(Path.of(raw.trim())) }.getOrNull()?.let { candidates.add(it) }
+        }
+
+        env("XILINX_VIVADO")?.takeIf { it.isNotBlank() }?.let {
+            runCatching { normalize(Path.of(it.trim())) }.getOrNull()?.let { p -> candidates.add(p) }
+        }
+
+        // `vivado` on PATH points at <install>/bin/vivado.
+        env("PATH")?.split(java.io.File.pathSeparatorChar)?.forEach { dir ->
+            if (dir.isBlank()) return@forEach
+            val base = runCatching { Path.of(dir.trim()) }.getOrNull() ?: return@forEach
+            for (exe in listOf("vivado", "vivado.bat")) {
+                val launcher = base.resolve(exe)
+                if (launcher.isRegularFile()) {
+                    launcher.parent?.parent?.let { candidates.add(it.normalize()) }
+                }
+            }
+        }
 
         for (root in INSTALL_ROOTS) {
             val base = runCatching { Path.of(root) }.getOrNull() ?: continue
@@ -66,6 +95,23 @@ object VivadoInstall {
 
     private fun looksLikeVivado(path: Path): Boolean =
         path.resolve("data/vhdl/src").isDirectory()
+
+    /**
+     * Accepts whatever the user had to hand: the install root, the `bin`
+     * directory, or the launcher itself. Asking people to know which one is
+     * meant is a pointless way to make a setting fail.
+     */
+    private fun normalize(path: Path): Path {
+        val p = path.normalize()
+        if (looksLikeVivado(p)) return p
+        if (p.name == "vivado" || p.name == "vivado.bat") {
+            p.parent?.parent?.let { if (looksLikeVivado(it)) return it.normalize() }
+        }
+        if (p.name == "bin") {
+            p.parent?.let { if (looksLikeVivado(it)) return it.normalize() }
+        }
+        return p
+    }
 
     /**
      * Vendor libraries present in [install]. Missing ones are skipped rather

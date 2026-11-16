@@ -107,7 +107,7 @@ object VivadoXprReader {
 
         // Xilinx primitives (BUFG, block RAM, clocking wizard, ...) resolve
         // only if the vendor libraries are mapped too.
-        val install = VivadoInstall.locate(VivadoInstall.versionFromXpr(xpr))
+        val install = VivadoLocator.install(VivadoInstall.versionFromXpr(xpr))
         if (install != null) {
             val vendor = VivadoInstall.vendorLibraries(install)
             libraries.addAll(vendor)

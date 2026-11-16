@@ -1,6 +1,6 @@
 package dev.vhdltoolkit.run
 
-import dev.vhdltoolkit.project.VivadoInstall
+import dev.vhdltoolkit.project.VivadoLocator
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
 
@@ -86,7 +86,7 @@ object VivadoTcl {
 object VivadoExecutable {
 
     fun find(preferredVersion: String? = null): Path? {
-        val install = VivadoInstall.locate(preferredVersion) ?: return null
+        val install = VivadoLocator.install(preferredVersion) ?: return null
         return forInstall(install)
     }
 
