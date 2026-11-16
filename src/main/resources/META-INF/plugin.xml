@@ -15,9 +15,13 @@
             <li>Comment/uncomment with <code>--</code>, parenthesis matching</li>
             <li>VHDL-LS binary bundled for Linux and Windows x86_64; other platforms use <code>vhdl_ls</code> from PATH</li>
         </ul>
-        <p>For whole-project analysis, put a <code>vhdl_ls.toml</code> in the project root mapping
-        your libraries; without it, open files are analyzed standalone.</p>
-        <p>Roadmap: smart <code>end</code> completion, Vivado (.xpr) project recognition.</p>
+        <p><b>Vivado and Sigasi projects configure themselves.</b> Open a directory containing a
+        Vivado <code>.xpr</code> or a Sigasi <code>.library_mapping.xml</code> and the plugin offers
+        to derive <code>vhdl_ls.toml</code> from it — filesets, per-file libraries and the project
+        default library included — then keeps it in step as the project file changes. Run it again
+        any time from <b>Tools | Sync VHDL Library Mapping</b>.</p>
+        <p>Roadmap: smart <code>end</code> completion, vendor libraries (unisim/xpm),
+        and taming cascaded diagnostics.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -52,5 +56,17 @@
         <notificationGroup
             id="VHDL Toolkit"
             displayType="BALLOON"/>
+        <postStartupActivity
+            implementation="dev.vhdltoolkit.project.VhdlProjectStartupActivity"/>
     </extensions>
+
+    <actions>
+        <action
+            id="dev.vhdltoolkit.SyncVhdlMapping"
+            class="dev.vhdltoolkit.project.SyncVhdlMappingAction"
+            text="Sync VHDL Library Mapping"
+            description="Regenerate vhdl_ls.toml from the Vivado or Sigasi project file">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

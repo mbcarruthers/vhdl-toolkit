@@ -18,9 +18,9 @@ import kotlin.io.path.isDirectory
  * <Mappings Location="src/legacy" Library="not mapped"/>
  * ```
  * An empty location is the project root. Two kinds of entry are dropped:
- * `Common Libraries/*`, which are Sigasi's own bundled `std`/`ieee` sources —
- * VHDL-LS ships its own copies — and anything mapped to `not mapped`, which is
- * Sigasi's way of excluding a folder.
+ * anything under `Common Libraries`, which are Sigasi's own bundled `std` and
+ * `ieee` sources (VHDL-LS ships its own copies), and anything mapped to
+ * `not mapped`, which is Sigasi's way of excluding a folder.
  */
 object SigasiMappingReader {
 
