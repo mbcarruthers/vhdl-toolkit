@@ -74,11 +74,11 @@ object LibraryNames {
      */
     fun sanitize(raw: String): String {
         if (isReserved(raw)) return DEFAULT_REPLACEMENT
+        // Replace only characters that are invalid anywhere. Digits are kept
+        // even in first position, so "2fast" becomes "lib_2fast" rather than
+        // "fast" — dropping the digit would let distinct libraries collide.
         val cleaned = buildString {
-            for ((i, c) in raw.withIndex()) {
-                val ok = if (i == 0) c.isLetter() else c.isLetterOrDigit() || c == '_'
-                append(if (ok) c else '_')
-            }
+            for (c in raw) append(if (c.isLetterOrDigit() || c == '_') c else '_')
         }
         val trimmed = cleaned.trim('_')
         return when {
