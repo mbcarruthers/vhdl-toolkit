@@ -89,6 +89,10 @@
             instance="dev.vhdltoolkit.settings.VhdlSettingsConfigurable"
             id="dev.vhdltoolkit.settings"
             displayName="VHDL Toolkit"/>
+
+        <!-- Run Vivado in batch mode from the IDE. -->
+        <configurationType
+            implementation="dev.vhdltoolkit.run.VivadoConfigurationType"/>
     </extensions>
 
     <actions>
