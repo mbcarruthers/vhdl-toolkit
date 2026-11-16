@@ -74,7 +74,7 @@ class PublishDiagnosticsFilterTest {
             5 to "No declaration of 'std_logic'",
         )
         val message = diagnosticsOf(filtered(input))[0].get("message").asString
-        assertTrue(message.contains("1 further error "), message)
+        assertTrue(message, message.contains("1 further error "))
     }
 
     @Test
