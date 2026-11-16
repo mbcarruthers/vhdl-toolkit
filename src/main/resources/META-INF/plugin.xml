@@ -20,6 +20,11 @@
         to derive <code>vhdl_ls.toml</code> from it — filesets, per-file libraries and the project
         default library included — then keeps it in step as the project file changes. Run it again
         any time from <b>Tools | Sync VHDL Library Mapping</b>.</p>
+        <p><b>Cascaded errors are collapsed.</b> A typo in a <code>use</code> clause makes every
+        name from that package unresolvable, which can turn one mistake into dozens of errors and
+        bury the real one. The plugin reconstructs the causal chain and reports only the root
+        cause, noting how many other errors follow from it. Toggle it under
+        <b>Settings | Languages &amp; Frameworks | VHDL Toolkit</b>.</p>
         <p>Constraints files (<code>.xdc</code>) are highlighted too: constraint commands,
         property names, option switches and Tcl substitution.</p>
         <p>Roadmap: smart <code>end</code> completion, vendor libraries (unisim/xpm),
@@ -79,6 +84,11 @@
             implementationClass="dev.vhdltoolkit.xdc.XdcCommenter"/>
         <colorSettingsPage
             implementation="dev.vhdltoolkit.xdc.XdcColorSettingsPage"/>
+        <applicationConfigurable
+            parentId="language"
+            instance="dev.vhdltoolkit.settings.VhdlSettingsConfigurable"
+            id="dev.vhdltoolkit.settings"
+            displayName="VHDL Toolkit"/>
     </extensions>
 
     <actions>

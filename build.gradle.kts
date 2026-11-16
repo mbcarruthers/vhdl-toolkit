@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.vhdltoolkit"
-version = "0.4.0"
+version = "0.5.0"
 
 repositories {
     mavenCentral()
@@ -20,6 +20,9 @@ dependencies {
     intellijPlatform {
         clion("2024.2.4")
     }
+    // Bundled rather than taken from the platform: the diagnostic proxy runs
+    // in its own JVM with only the plugin's own jars on the classpath.
+    implementation("com.google.code.gson:gson:2.11.0")
     testImplementation("junit:junit:4.13.2")
 }
 
