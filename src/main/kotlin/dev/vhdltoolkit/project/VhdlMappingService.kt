@@ -173,7 +173,11 @@ class VhdlMappingService(private val project: Project) {
         val dir = projectDir() ?: return null
         val toml = tomlPath() ?: return null
 
-        val model = read(source)
+        // Check the mapping against what the sources actually reference, so a
+        // format that cannot express libraries (a file list) or a mapping with
+        // a gap in it is reported rather than silently producing a config that
+        // does not resolve.
+        val model = LibraryReferenceValidator.validate(read(source))
         val content = VhdlLsTomlWriter.render(model, dir)
 
         val written = runCatching {

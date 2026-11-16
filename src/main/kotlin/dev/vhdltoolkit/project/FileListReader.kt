@@ -41,6 +41,19 @@ object FileListReader {
             warnings.add(ImportWarning("No VHDL sources listed in ${listFile.fileName}."))
         }
 
+        // A file list has no concept of a library: the tool that consumes it
+        // supplies one (GHDL's --work, ModelSim's -work, Vivado's
+        // set_property library). Everything goes into one library and the
+        // validator reports it if the sources expect another name.
+        if (files.isNotEmpty()) {
+            warnings.add(
+                ImportWarning(
+                    "A file list does not record library names, so every source was placed in " +
+                        "'${LibraryNames.DEFAULT_REPLACEMENT}'.",
+                ),
+            )
+        }
+
         return LibraryMappingModel(
             libraries = if (files.isEmpty()) {
                 emptyList()
