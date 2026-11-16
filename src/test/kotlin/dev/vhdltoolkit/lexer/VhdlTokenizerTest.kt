@@ -93,8 +93,9 @@ class VhdlTokenizerTest {
             listOf(Kind.IDENTIFIER, Kind.OPERATOR, Kind.NUMBER, Kind.SEMICOLON),
             kinds("v := 7;"),
         )
+        // `others` is a reserved word in VHDL, so it lexes as a keyword.
         assertEquals(
-            listOf(Kind.KEYWORD, Kind.IDENTIFIER, Kind.OPERATOR, Kind.IDENTIFIER),
+            listOf(Kind.KEYWORD, Kind.KEYWORD, Kind.OPERATOR, Kind.IDENTIFIER),
             kinds("when others => null_x"),
         )
     }
