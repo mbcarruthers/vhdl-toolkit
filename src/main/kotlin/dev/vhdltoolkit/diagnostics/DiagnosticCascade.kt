@@ -62,10 +62,28 @@ object DiagnosticCascade {
      */
     private val UNRESOLVED_PATTERNS = listOf(
         Regex("""[Nn]o declaration of '([^']+)'"""),
+        // A missing library is reported in its own words, and is usually the
+        // first link in the chain rather than a consequence of one.
+        Regex("""[Nn]o such (?:library|package|entity|component|design unit) '([^']+)'"""),
         Regex("""[Cc]ould not resolve '([^']+)'"""),
         Regex("""'([^']+)' is not declared"""),
         Regex("""[Uu]nknown (?:type|identifier|name) '([^']+)'"""),
     )
+
+    /**
+     * Lint warnings whose premise fails once something upstream did not
+     * resolve. "Unused" is a claim about the whole design: a generic looks
+     * unused when the entity it is passed to could not be found, so these are
+     * not evidence of anything while a context clause is broken.
+     */
+    private val UNRELIABLE_WHEN_POISONED = listOf(
+        Regex("""[Uu]nused declaration"""),
+        Regex("""[Uu]nused (?:generic|port|signal|variable|constant|type|subprogram)"""),
+        Regex("""is never (?:read|used|assigned)"""),
+    )
+
+    private fun isUnreliableWhenPoisoned(message: String): Boolean =
+        UNRELIABLE_WHEN_POISONED.any { it.containsMatchIn(message) }
 
     /** A context clause: the statements whose failure poisons a whole package. */
     private val CONTEXT_CLAUSE = Regex("""^\s*(library|use|context)\b""", RegexOption.IGNORE_CASE)
@@ -83,11 +101,15 @@ object DiagnosticCascade {
 
         val verdicts = MutableList(diagnostics.size) { Verdict.ROOT }
 
-        // Rule 1: a broken context clause poisons every name it would import.
-        val brokenContextClause = diagnostics.indices.any { onContextClause[it] }
+        // Rule 1: a broken context clause poisons every name it would import,
+        // and makes "unused" judgements meaningless for the whole file.
+        val brokenContextClause = diagnostics.indices.any {
+            onContextClause[it] && diagnostics[it].severity == SEVERITY_ERROR
+        }
         if (brokenContextClause) {
             for (i in diagnostics.indices) {
-                if (!onContextClause[i] && unresolvedSymbol[i] != null) {
+                if (onContextClause[i]) continue
+                if (unresolvedSymbol[i] != null || isUnreliableWhenPoisoned(diagnostics[i].message)) {
                     verdicts[i] = Verdict.DERIVED
                 }
             }

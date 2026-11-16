@@ -22,6 +22,15 @@ class VhdlMappingService(private val project: Project) {
 
     companion object {
         const val TOML_NAME = "vhdl_ls.toml"
+
+        /** Deep enough for `rtl/system_integration/<build dir>/x.xpr`. */
+        private const val MAX_PROJECT_SEARCH_DEPTH = 4
+
+        /** Vivado's generated trees; a project file is never inside one. */
+        private val GENERATED_SUFFIXES = listOf(
+            ".runs", ".cache", ".gen", ".hw", ".sim", ".ip_user_files", ".srcs",
+        )
+
         fun getInstance(project: Project): VhdlMappingService = project.service()
     }
 
@@ -71,7 +80,7 @@ class VhdlMappingService(private val project: Project) {
         val dir = projectDir() ?: return null
         if (!Files.isDirectory(dir)) return null
 
-        firstFileWithExtension(dir, "xpr")?.let { return Source.Vivado(it) }
+        findVivadoProject(dir)?.let { return Source.Vivado(it) }
 
         val sigasi = dir.resolve(SigasiMappingReader.FILE_NAME)
         if (sigasi.isRegularFile()) return Source.Sigasi(sigasi)
@@ -104,6 +113,51 @@ class VhdlMappingService(private val project: Project) {
                 .orElse(null)
         }
     }.getOrNull()
+
+    /**
+     * Finds a `.xpr` anywhere near the top of the tree, not only in the root.
+     *
+     * A script decides where it puts the project, and that is rarely the
+     * repository root: NEORV32's packaging script writes to
+     * `rtl/system_integration/neorv32_vivado_ip_work/`. Searching the root
+     * alone meant falling through to a file list, which carries no library
+     * names, when an authoritative `.xpr` was sitting three levels down.
+     *
+     * The walk is depth-limited and skips Vivado's own output directories,
+     * which never contain a project file and can be enormous.
+     */
+    private fun findVivadoProject(root: Path): Path? {
+        val found = ArrayList<Path>()
+
+        fun walk(dir: Path, depth: Int) {
+            if (depth > MAX_PROJECT_SEARCH_DEPTH) return
+            val entries = runCatching {
+                Files.list(dir).use { it.toList() }
+            }.getOrNull() ?: return
+
+            for (entry in entries) {
+                when {
+                    entry.isRegularFile() && entry.extension.equals("xpr", ignoreCase = true) ->
+                        found.add(entry)
+
+                    Files.isDirectory(entry) && !isSkippedDirectory(entry) ->
+                        walk(entry, depth + 1)
+                }
+            }
+        }
+        walk(root, 0)
+
+        // Shallowest first: a project at the root is more likely the one
+        // meant than a scratch project nested in a build directory.
+        return found.minByOrNull { root.relativize(it).nameCount }
+    }
+
+    private fun isSkippedDirectory(dir: Path): Boolean {
+        val name = dir.fileName?.toString() ?: return true
+        if (name.startsWith(".")) return true
+        // Vivado's generated trees: no .xpr lives inside them, and they are big.
+        return GENERATED_SUFFIXES.any { name.endsWith(it) }
+    }
 
     /** Looks in the root and the directories build scripts conventionally use. */
     private fun searchDirs(dir: Path): List<Path> =

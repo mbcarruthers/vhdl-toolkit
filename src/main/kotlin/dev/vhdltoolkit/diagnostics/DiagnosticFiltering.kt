@@ -49,7 +49,10 @@ object DiagnosticFiltering {
                 return original
             }
 
-            note(kept.first(), analysis.derivedCount)
+            val suppressedErrors = original.indices.count {
+                analysis.isDerived(it) && original[it].severity == org.eclipse.lsp4j.DiagnosticSeverity.Error
+            }
+            note(kept.first(), analysis.derivedCount, suppressedErrors)
             kept
         } catch (e: Exception) {
             LOG.warn("Diagnostic filtering failed for ${params.uri}; showing all", e)
@@ -57,11 +60,19 @@ object DiagnosticFiltering {
         }
     }
 
-    /** Records on the root error how much else followed from it. */
-    private fun note(diagnostic: LspDiagnostic, suppressed: Int) {
-        val plural = if (suppressed == 1) "error" else "errors"
+    /**
+     * Records on the root how much else followed from it. Says "problems"
+     * rather than "errors" when warnings were collapsed too, since claiming
+     * errors were hidden when they were warnings would misrepresent what was
+     * taken away.
+     */
+    private fun note(diagnostic: LspDiagnostic, suppressed: Int, suppressedErrors: Int) {
+        val noun = when {
+            suppressedErrors == suppressed -> if (suppressed == 1) "error" else "errors"
+            else -> if (suppressed == 1) "problem" else "problems"
+        }
         diagnostic.message =
-            "${diagnostic.message}\n($suppressed further $plural in this file follow from this one)"
+            "${diagnostic.message}\n($suppressed further $noun in this file follow from this one)"
     }
 
     private fun LspDiagnostic.toCascadeDiagnostic(): DiagnosticCascade.Diagnostic =
