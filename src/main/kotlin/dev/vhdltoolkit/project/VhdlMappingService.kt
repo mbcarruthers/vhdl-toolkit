@@ -37,30 +37,48 @@ class VhdlMappingService(private val project: Project) {
         data class Sigasi(override val file: Path) : Source {
             override val label: String get() = "Sigasi library mapping"
         }
+
+        /** An HDL file list; readable directly, no Vivado needed. */
+        data class FileList(override val file: Path) : Source {
+            override val label: String get() = "file list ${file.name}"
+        }
+
+        /**
+         * A Tcl script that builds a Vivado project. Importing means running
+         * it first, so this is only ever offered, never acted on silently.
+         */
+        data class TclScript(
+            override val file: Path,
+            val analysis: TclProjectScript.Analysis,
+        ) : Source {
+            override val label: String get() = "Vivado script ${file.name}"
+        }
     }
 
     fun projectDir(): Path? = project.basePath?.let { Path.of(it) }
 
     /**
-     * Looks for an importable project file in the project root. Vivado wins
-     * when both exist, since an `.xpr` is the authoritative build description.
+     * Looks for something describing the project, in descending order of
+     * directness: an existing `.xpr`, then a Sigasi mapping, then a file list
+     * (readable without any tool), and finally a Tcl script that would have
+     * to be run first.
+     *
+     * A committed `.xpr` is rare in shared projects — it is generated,
+     * machine-specific and version-locked — so the later options are what
+     * most cloned repositories actually offer.
      */
     fun detectSource(): Source? {
         val dir = projectDir() ?: return null
         if (!Files.isDirectory(dir)) return null
 
-        val xpr = runCatching {
-            Files.list(dir).use { stream ->
-                stream.filter { it.isRegularFile() && it.extension.equals("xpr", ignoreCase = true) }
-                    .sorted()
-                    .findFirst()
-                    .orElse(null)
-            }
-        }.getOrNull()
-        if (xpr != null) return Source.Vivado(xpr)
+        firstFileWithExtension(dir, "xpr")?.let { return Source.Vivado(it) }
 
         val sigasi = dir.resolve(SigasiMappingReader.FILE_NAME)
         if (sigasi.isRegularFile()) return Source.Sigasi(sigasi)
+
+        findFileList(dir)?.let { return Source.FileList(it) }
+
+        findProjectScript(dir)?.let { return it }
 
         return null
     }
@@ -70,6 +88,53 @@ class VhdlMappingService(private val project: Project) {
         // login-shell environment, neither of which the bare reader can see.
         is Source.Vivado -> VivadoXprReader.read(source.file) { version -> VivadoLocator.install(version) }
         is Source.Sigasi -> SigasiMappingReader.read(source.file)
+        is Source.FileList -> FileListReader.read(source.file)
+        is Source.TclScript -> LibraryMappingModel(
+            libraries = emptyList(),
+            source = source.label,
+            warnings = listOf(ImportWarning("Run the script first to generate a project.")),
+        )
+    }
+
+    private fun firstFileWithExtension(dir: Path, extension: String): Path? = runCatching {
+        Files.list(dir).use { stream ->
+            stream.filter { it.isRegularFile() && it.extension.equals(extension, ignoreCase = true) }
+                .sorted()
+                .findFirst()
+                .orElse(null)
+        }
+    }.getOrNull()
+
+    /** Looks in the root and the directories build scripts conventionally use. */
+    private fun searchDirs(dir: Path): List<Path> =
+        listOf(dir) + listOf("rtl", "scripts", "vivado", "synthesis", "fpga", "build")
+            .map { dir.resolve(it) }
+            .filter { Files.isDirectory(it) }
+
+    private fun findFileList(dir: Path): Path? =
+        searchDirs(dir).firstNotNullOfOrNull { firstFileWithExtension(it, "f") }
+
+    /**
+     * The first Tcl script that would actually leave a project behind.
+     * Non-project-mode and block-design scripts are skipped: running them
+     * produces no `.xpr`, so offering to is a waste of the user's time.
+     */
+    private fun findProjectScript(dir: Path): Source.TclScript? {
+        for (searchDir in searchDirs(dir)) {
+            val scripts = runCatching {
+                Files.list(searchDir).use { stream ->
+                    stream.filter { it.isRegularFile() && TclProjectScript.isTclScript(it) }
+                        .sorted()
+                        .toList()
+                }
+            }.getOrNull().orEmpty()
+
+            for (script in scripts) {
+                val analysis = TclProjectScript.classify(script) ?: continue
+                if (analysis.isImportable) return Source.TclScript(script, analysis)
+            }
+        }
+        return null
     }
 
     fun tomlPath(): Path? = projectDir()?.resolve(TOML_NAME)

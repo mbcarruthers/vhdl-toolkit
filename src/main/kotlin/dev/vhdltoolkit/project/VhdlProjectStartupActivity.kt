@@ -24,11 +24,20 @@ class VhdlProjectStartupActivity : ProjectActivity {
         val source = service.detectSource() ?: return
 
         when {
+            // A Tcl script has to be run before anything can be imported, so
+            // it gets its own prompt explaining that.
+            !service.tomlExists() && source is VhdlMappingService.Source.TclScript ->
+                offerScript(project, source)
+
             // Nothing there yet: offer to create it.
             !service.tomlExists() -> offer(
                 project,
-                title = "Vivado project detected".takeIf { source is VhdlMappingService.Source.Vivado }
-                    ?: "Sigasi project detected",
+                title = when (source) {
+                    is VhdlMappingService.Source.Vivado -> "Vivado project detected"
+                    is VhdlMappingService.Source.Sigasi -> "Sigasi project detected"
+                    is VhdlMappingService.Source.FileList -> "HDL file list detected"
+                    is VhdlMappingService.Source.TclScript -> "Vivado script detected"
+                },
                 body = "Generate ${VhdlMappingService.TOML_NAME} from ${source.label} so VHDL-LS can " +
                     "resolve names across your files?",
                 source = source,
@@ -85,6 +94,28 @@ class VhdlProjectStartupActivity : ProjectActivity {
                             ).notify(project)
                         }
                     }
+                },
+            )
+            .notify(project)
+    }
+
+    /**
+     * A Tcl script cannot simply be read: Vivado has to run it. That is a
+     * heavier thing to agree to than generating a config file, so it is asked
+     * for separately and in plainer terms.
+     */
+    private fun offerScript(project: Project, source: VhdlMappingService.Source.TclScript) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("VHDL Toolkit")
+            .createNotification(
+                "Vivado script detected",
+                "${source.file.fileName} creates a Vivado project, but none exists yet. " +
+                    "Running it would let the library mapping be derived from the result.",
+                NotificationType.INFORMATION,
+            )
+            .addAction(
+                NotificationAction.createSimpleExpiring("Run it…") {
+                    GenerateProjectFromTcl.confirmAndRun(project, source)
                 },
             )
             .notify(project)
