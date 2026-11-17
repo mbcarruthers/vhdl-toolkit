@@ -33,6 +33,15 @@ class VhdlSettings : PersistentStateComponent<VhdlSettings> {
      */
     var vivadoPath: String = ""
 
+    /**
+     * Indent `when` alternatives one level inside their `case`.
+     *
+     * Both styles are widely used and VHDL prefers neither, so this is the
+     * author's call rather than the plugin's. The default is the more common
+     * of the two.
+     */
+    var indentWhenInCase: Boolean = true
+
     /** Insert the matching `end` when a block-opening line is completed. */
     var completeBlocks: Boolean = true
 

@@ -142,4 +142,41 @@ class VhdlKeywordCompletionTest {
             .map { it.text.lowercase() to (it.template != null) }
         assertEquals(all.size, all.distinct().size)
     }
+
+    /**
+     * The gap that made the popup look wrong: typing a reserved word that
+     * joins a header offered nothing of ours, leaving only whatever the
+     * language server matched loosely.
+     */
+    @Test
+    fun headerWordsAreOffered() {
+        assertTrue("is" in words("architecture rtl of foo |"))
+        assertTrue("of" in words("architecture rtl |"))
+        assertTrue("all" in words("use ieee.std_logic_1164.|"))
+        assertTrue("is" in words("architecture rtl of foo is\n    type t |"))
+    }
+
+    @Test
+    fun operatorsThatAreReservedWordsAreOffered() {
+        val seq = words("architecture a of b is\nbegin\n    process (c)\n    begin\n        ")
+        assertTrue(seq.containsAll(setOf("and", "or", "not", "xor", "nand", "mod", "sll")))
+    }
+
+    @Test
+    fun rangeVocabularyIsOfferedWhereASubtypeCanAppear() {
+        assertTrue(words("entity foo is\n    port (\n        a : in std_logic_vector(3 |").contains("downto"))
+        assertTrue("range" in words("architecture rtl of foo is\n    subtype s |"))
+        assertTrue("others" in words("architecture a of b is\nbegin\n    process (c)\n    begin\n        "))
+    }
+
+    @Test
+    fun recordAndArrayAreOfferedInDeclarations() {
+        val got = words("architecture rtl of foo is\n    type t is |")
+        assertTrue(got.containsAll(setOf("array", "record")))
+    }
+
+    @Test
+    fun aPortMapIsOfferedInAConcurrentBody() {
+        assertTrue("map" in words("architecture rtl of foo is\nbegin\n    "))
+    }
 }

@@ -42,6 +42,7 @@ class VhdlLineIndentProvider : LineIndentProvider {
             offset = offset,
             indentSize = indentSize,
             lineStartsWith = null,
+            indentWhenInCase = VhdlSettings.getInstance().indentWhenInCase,
         )
         return renderIndent(columns, useTabs, tabSize)
     }
@@ -69,6 +70,11 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
 
     override fun charTyped(c: Char, project: Project, editor: Editor, file: PsiFile): Result {
         if (file.language !is VhdlLanguage) return Result.CONTINUE
+
+        if (c == '(') {
+            closeInterfaceList(editor)
+            return Result.CONTINUE
+        }
         if (!c.isLetter() && c != ')') return Result.CONTINUE
 
         val document = editor.document
@@ -87,6 +93,30 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
         return Result.CONTINUE
     }
 
+    /**
+     * Gives a `port (`, `generic (` or `port map (` its trailing semicolon.
+     *
+     * These parentheses end the statement they belong to, so stopping at `)`
+     * leaves a line that is always wrong. The brace matcher has usually
+     * already supplied the `)`, in which case only the `;` is added; if pair
+     * insertion is switched off, both go in. The caret stays between the
+     * brackets either way, which is where the next thing is typed.
+     */
+    private fun closeInterfaceList(editor: Editor) {
+        val document = editor.document
+        val caret = editor.caretModel.offset
+        val text = document.charsSequence
+        if (!VhdlParenCompletion.needsSemicolon(text, caret - 1)) return
+
+        if (caret < text.length && text[caret] == ')') {
+            if (caret + 1 < text.length && text[caret + 1] == ';') return
+            document.insertString(caret + 1, ";")
+        } else {
+            document.insertString(caret, ");")
+        }
+        editor.caretModel.moveToOffset(caret)
+    }
+
     private fun reindentLine(project: Project, document: Document, lineNumber: Int, firstWord: String) {
         val indentOptions = runCatching { CodeStyle.getIndentOptions(project, document) }.getOrNull()
         val indentSize = indentOptions?.INDENT_SIZE?.takeIf { it > 0 } ?: VhdlLineIndentProvider.DEFAULT_INDENT
@@ -99,6 +129,7 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
             offset = lineStart,
             indentSize = indentSize,
             lineStartsWith = firstWord,
+            indentWhenInCase = VhdlSettings.getInstance().indentWhenInCase,
         )
         val wanted = VhdlLineIndentProvider.renderIndent(columns, useTabs, tabSize)
 

@@ -20,6 +20,7 @@ class VhdlSettingsConfigurable : Configurable {
     private var vivadoPath: TextFieldWithBrowseButton? = null
     private var completeBlocks: JBCheckBox? = null
     private var insertBegin: JBCheckBox? = null
+    private var whenIndent: javax.swing.JComboBox<Boolean>? = null
     private var endStyle: javax.swing.JComboBox<EndStyle>? = null
 
     override fun getDisplayName(): String = "VHDL Toolkit"
@@ -65,6 +66,22 @@ class VhdlSettingsConfigurable : Configurable {
             }
         }
 
+        val whenCombo = javax.swing.JComboBox(
+            javax.swing.DefaultComboBoxModel(arrayOf(true, false)),
+        ).also { box ->
+            whenIndent = box
+            box.renderer = com.intellij.ui.SimpleListCellRenderer.create("") { indented ->
+                if (indented) "indented inside the case" else "level with the case"
+            }
+        }
+
+        val whenNote = JBLabel(
+            "<html>Both are in common use and VHDL prefers neither, so this is yours to pick. " +
+                "It decides the indent suggested for a line beginning <code>when</code>; " +
+                "statements inside an alternative are measured from the <code>when</code> " +
+                "wherever you actually put it.</html>",
+        ).apply { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND }
+
         val pathNote = JBLabel(
             "<html>Leave empty to detect it from <code>XILINX_VIVADO</code> or <code>PATH</code>. " +
                 "Set it if the IDE cannot find Vivado — a GUI-launched IDE does not read " +
@@ -92,6 +109,8 @@ class VhdlSettingsConfigurable : Configurable {
             .addComponent(complete)
             .addComponent(begin)
             .addLabeledComponent("Closing style:", endStyleCombo)
+            .addLabeledComponent("Case alternatives:", whenCombo)
+            .addComponentToRightColumn(whenNote)
             .addSeparator()
             .addLabeledComponent("Vivado installation:", pathField)
             .addComponentToRightColumn(pathNote)
@@ -106,6 +125,7 @@ class VhdlSettingsConfigurable : Configurable {
             vivadoPath?.text.orEmpty() != settings.vivadoPath ||
             completeBlocks?.isSelected != settings.completeBlocks ||
             insertBegin?.isSelected != settings.insertBegin ||
+            whenIndent?.selectedItem != settings.indentWhenInCase ||
             (endStyle?.selectedItem as? EndStyle)?.name != settings.endStyle
     }
 
@@ -116,6 +136,7 @@ class VhdlSettingsConfigurable : Configurable {
         settings.vivadoPath = vivadoPath?.text.orEmpty().trim()
         settings.completeBlocks = completeBlocks?.isSelected ?: true
         settings.insertBegin = insertBegin?.isSelected ?: true
+        settings.indentWhenInCase = whenIndent?.selectedItem as? Boolean ?: true
         settings.endStyle = (endStyle?.selectedItem as? EndStyle)?.name ?: EndStyle.KEYWORD_AND_NAME.name
         // The proxy is chosen at launch, so the change needs a server restart.
         for (project in ProjectManager.getInstance().openProjects) {
@@ -130,6 +151,7 @@ class VhdlSettingsConfigurable : Configurable {
         vivadoPath?.text = settings.vivadoPath
         completeBlocks?.isSelected = settings.completeBlocks
         insertBegin?.isSelected = settings.insertBegin
+        whenIndent?.selectedItem = settings.indentWhenInCase
         endStyle?.selectedItem = settings.endStyleEnum
     }
 
@@ -139,6 +161,7 @@ class VhdlSettingsConfigurable : Configurable {
         vivadoPath = null
         completeBlocks = null
         insertBegin = null
+        whenIndent = null
         endStyle = null
     }
 }

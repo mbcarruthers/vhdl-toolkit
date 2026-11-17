@@ -116,10 +116,28 @@ object VhdlKeywordCompletion {
 
     private fun kw(vararg words: String) = words.map { Suggestion(it) }
 
+    /**
+     * Words that join a construct's header rather than opening one: `entity x
+     * is`, `architecture a of e is`, `use ieee.x.all`. Leaving them out was
+     * what made the popup look broken — typing `is` offered nothing of ours,
+     * so the only candidate left was whatever the language server fuzzily
+     * matched.
+     */
+    private val HEADER_WORDS = kw("is", "of", "all")
+
+    /** Operators that are reserved words, so no symbol stands in for them. */
+    private val OPERATORS = kw(
+        "and", "or", "nand", "nor", "xor", "xnor", "not", "abs", "mod", "rem",
+        "sll", "srl", "sla", "sra", "rol", "ror",
+    )
+
+    /** Range and choice vocabulary, needed wherever a subtype may appear. */
+    private val RANGE_WORDS = kw("to", "downto", "range", "others")
+
     private val DESIGN_FILE_KEYWORDS = kw(
         "library", "use", "entity", "architecture", "package", "package body",
         "configuration", "context",
-    ) + listOf(
+    ) + HEADER_WORDS + listOf(
         Suggestion(
             "entity",
             template = "entity \$NAME\$ is\n    port (\n        \$CURSOR$\n    );\nend entity \$NAME\$;",
@@ -133,18 +151,24 @@ object VhdlKeywordCompletion {
     )
 
     private val ENTITY_KEYWORDS = kw(
-        "port", "generic", "in", "out", "inout", "buffer", "signal", "constant", "end",
-    )
+        "port", "generic", "in", "out", "inout", "buffer", "linkage",
+        "signal", "constant", "variable", "end",
+    ) + HEADER_WORDS + RANGE_WORDS
 
     private val DECLARATIVE_KEYWORDS = kw(
         "signal", "constant", "variable", "shared variable", "type", "subtype",
-        "component", "function", "procedure", "impure function", "alias",
-        "attribute", "file", "use", "for",
-    )
+        "component", "function", "procedure", "impure function", "pure function",
+        "alias", "attribute", "file", "use", "for", "array", "record", "units",
+        "access", "protected", "body", "generic", "port", "map", "open",
+        "register", "bus", "return", "new", "null",
+    ) + HEADER_WORDS + RANGE_WORDS + OPERATORS
 
     private val CONCURRENT_KEYWORDS = kw(
-        "process", "block", "generate", "with", "assert", "signal", "component", "for",
-    ) + listOf(
+        "process", "block", "generate", "with", "select", "assert", "report",
+        "severity", "signal", "component", "constant", "for", "entity",
+        "configuration", "map", "open", "after", "transport", "postponed",
+        "guarded", "unaffected", "when", "else", "end",
+    ) + HEADER_WORDS + RANGE_WORDS + OPERATORS + listOf(
         Suggestion(
             "process",
             template = "process (\$SENSITIVITY\$)\nbegin\n    \$CURSOR$\nend process;",
@@ -158,10 +182,10 @@ object VhdlKeywordCompletion {
     )
 
     private val SEQUENTIAL_KEYWORDS = kw(
-        "if", "then", "elsif", "else", "case", "when", "others", "for", "while",
-        "loop", "exit", "next", "wait", "report", "assert", "severity", "null",
-        "return", "variable",
-    ) + listOf(
+        "if", "then", "elsif", "else", "case", "when", "for", "while",
+        "loop", "exit", "next", "wait", "until", "on", "report", "assert",
+        "severity", "null", "return", "variable", "end", "after", "new",
+    ) + HEADER_WORDS + RANGE_WORDS + OPERATORS + listOf(
         Suggestion(
             "if",
             template = "if \$COND\$ then\n    \$CURSOR$\nend if;",

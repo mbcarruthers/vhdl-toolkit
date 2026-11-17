@@ -6,6 +6,7 @@ import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.completion.InsertHandler
 import com.intellij.codeInsight.completion.InsertionContext
+import com.intellij.codeInsight.completion.PrioritizedLookupElement
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.util.TextRange
@@ -43,10 +44,42 @@ private class VhdlKeywordProvider : com.intellij.codeInsight.completion.Completi
     ) {
         val text = parameters.originalFile.text
         val offset = parameters.offset.coerceIn(0, text.length)
+        val prefix = result.prefixMatcher.prefix.lowercase()
 
         for (suggestion in VhdlKeywordCompletion.suggestionsFor(text, offset)) {
-            result.addElement(toLookupElement(suggestion))
+            result.addElement(prioritise(toLookupElement(suggestion), suggestion, prefix))
         }
+    }
+
+    /**
+     * Ranks a suggestion against whatever the language server is also
+     * offering.
+     *
+     * The server completes names from across the project and matches them
+     * loosely, so typing `is` can surface `rising_edge` on the strength of the
+     * letters buried in the middle of it. A reserved word the author has begun
+     * spelling out is almost always what they meant, so it is lifted above
+     * such matches rather than filtered out of them — the server's list is not
+     * ours to censor, and sometimes it is right.
+     *
+     * Skeletons sit just below the bare keyword they share a name with, so
+     * `process` followed by Enter still types the word.
+     */
+    private fun prioritise(
+        element: LookupElement,
+        suggestion: VhdlKeywordCompletion.Suggestion,
+        prefix: String,
+    ): LookupElement {
+        val word = suggestion.text.lowercase()
+        val base = when {
+            prefix.isEmpty() -> 0.0
+            word == prefix -> 100.0
+            word.startsWith(prefix) -> 50.0
+            else -> 0.0
+        }
+        val priority = if (suggestion.template != null) base - 1.0 else base
+        if (priority == 0.0) return element
+        return PrioritizedLookupElement.withPriority(element, priority)
     }
 
     private fun toLookupElement(suggestion: VhdlKeywordCompletion.Suggestion): LookupElement {

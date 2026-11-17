@@ -192,6 +192,7 @@ object VhdlBlockStructure {
         offset: Int,
         indentSize: Int,
         lineStartsWith: String? = null,
+        indentWhenInCase: Boolean = true,
     ): Int {
         val state = analyze(text, offset)
         val frame = state.innermost ?: return 0
@@ -199,10 +200,18 @@ object VhdlBlockStructure {
 
         if (word in DEDENTING_LINE_STARTS) {
             return when (word) {
-                // `when` aligns with sibling alternatives, one inside the case.
+                // Both styles are in common use and the language does not
+                // prefer either, so this follows the setting rather than
+                // imposing a house style. Whichever is chosen, statements
+                // inside the alternative are measured from the `when` as the
+                // author actually placed it.
                 "when" -> {
                     val case = state.frames.lastOrNull { it.construct == Construct.CASE }
-                    if (case != null) case.headerColumn + indentSize else frame.headerColumn
+                    when {
+                        case == null -> frame.headerColumn
+                        indentWhenInCase -> case.headerColumn + indentSize
+                        else -> case.headerColumn
+                    }
                 }
                 // A closing keyword lines up with whatever it closes, skipping
                 // any `when` alternatives still open inside a case.
