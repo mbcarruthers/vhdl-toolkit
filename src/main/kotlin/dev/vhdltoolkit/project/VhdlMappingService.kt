@@ -13,7 +13,7 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 
 /**
- * Finds a project description that already exists (a Vivado `.xpr`, a Sigasi
+ * Finds a project description that already exists (a Vivado `.xpr`, a Tcl
  * mapping) and keeps `vhdl_ls.toml` in step with it, so the library mapping is
  * never maintained by hand.
  */
@@ -43,8 +43,9 @@ class VhdlMappingService(private val project: Project) {
             override val label: String get() = "Vivado project ${file.name}"
         }
 
-        data class Sigasi(override val file: Path) : Source {
-            override val label: String get() = "Sigasi library mapping"
+        /** No project file; every VHDL source under the root. */
+        data class SourceScan(override val file: Path) : Source {
+            override val label: String get() = "source scan"
         }
 
         /** An HDL file list; readable directly, no Vivado needed. */
@@ -68,9 +69,9 @@ class VhdlMappingService(private val project: Project) {
 
     /**
      * Looks for something describing the project, in descending order of
-     * directness: an existing `.xpr`, then a Sigasi mapping, then a file list
-     * (readable without any tool), and finally a Tcl script that would have
-     * to be run first.
+     * directness: an existing `.xpr`, then a file list (readable without any
+     * tool), then a Tcl script that would have to be run first, and finally a
+     * plain scan of the sources on disk.
      *
      * A committed `.xpr` is rare in shared projects — it is generated,
      * machine-specific and version-locked — so the later options are what
@@ -82,21 +83,21 @@ class VhdlMappingService(private val project: Project) {
 
         findVivadoProject(dir)?.let { return Source.Vivado(it) }
 
-        val sigasi = dir.resolve(SigasiMappingReader.FILE_NAME)
-        if (sigasi.isRegularFile()) return Source.Sigasi(sigasi)
-
         findFileList(dir)?.let { return Source.FileList(it) }
 
         findProjectScript(dir)?.let { return it }
 
-        return null
+        // Nothing describes this project, so fall back to looking at what is
+        // actually on disk. A plain folder of sources previously got no
+        // mapping at all, and therefore no cross-file resolution.
+        return Source.SourceScan(dir)
     }
 
     fun read(source: Source): LibraryMappingModel = when (source) {
         // Inside the IDE, Vivado is located with the plugin setting and the
         // login-shell environment, neither of which the bare reader can see.
         is Source.Vivado -> VivadoXprReader.read(source.file) { version -> VivadoLocator.install(version) }
-        is Source.Sigasi -> SigasiMappingReader.read(source.file)
+        is Source.SourceScan -> SourceScanReader.read(source.file)
         is Source.FileList -> FileListReader.read(source.file)
         is Source.TclScript -> LibraryMappingModel(
             libraries = emptyList(),

@@ -15,7 +15,7 @@ import java.nio.file.Path
  *
  * That is deliberately a statement of fact rather than an inference. It
  * catches a file list whose sources expect a named library, an `.xpr` whose
- * vendor libraries are unmapped, and a Sigasi mapping with a hole in it —
+ * vendor libraries are unmapped, and a source scan that guessed a name —
  * without any of those cases needing their own special rule.
  */
 object LibraryReferenceValidator {

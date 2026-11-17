@@ -5,8 +5,8 @@ import java.nio.file.Path
 /**
  * The shared description of "which source files belong to which VHDL library".
  *
- * Every importer (Vivado `.xpr`, Sigasi `.library_mapping.xml`, and whatever
- * comes later) produces this, and the single toml writer consumes it. Keeping
+ * Every importer (a Vivado `.xpr`, a file list, a plain source scan, and
+ * whatever comes later) produces this, and one toml writer consumes it. Keeping
  * one model means library-naming rules and path handling are implemented once.
  */
 data class SourceLibrary(

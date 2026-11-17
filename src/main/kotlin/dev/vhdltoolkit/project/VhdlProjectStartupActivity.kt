@@ -8,8 +8,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 
 /**
- * On opening a project, notices that it is a Vivado or Sigasi project and
- * offers to derive the VHDL library mapping from it.
+ * On opening a project, works out how its library mapping could be derived
+ * and offers to generate one.
  *
  * It offers rather than acts: writing a file into someone's project without
  * asking is the kind of thing a tool should not do on first contact. Once the
@@ -34,7 +34,7 @@ class VhdlProjectStartupActivity : ProjectActivity {
                 project,
                 title = when (source) {
                     is VhdlMappingService.Source.Vivado -> "Vivado project detected"
-                    is VhdlMappingService.Source.Sigasi -> "Sigasi project detected"
+                    is VhdlMappingService.Source.SourceScan -> "VHDL sources detected"
                     is VhdlMappingService.Source.FileList -> "HDL file list detected"
                     is VhdlMappingService.Source.TclScript -> "Vivado script detected"
                 },

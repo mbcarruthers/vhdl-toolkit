@@ -155,7 +155,7 @@ class LibraryReferenceValidatorTest {
 
     @Test
     fun theWorkRenameDoesNotLookLikeAGap() {
-        // Sigasi maps to 'work'; the writer renames it. Neither spelling
+        // An importer may map to 'work'; the writer renames it. Neither spelling
         // should be reported as missing.
         val file = source("rtl/a.vhd", "library ieee;\nuse ieee.std_logic_1164.all;")
         assertTrue(LibraryReferenceValidator.validate(model("work", file)).warnings.isEmpty())

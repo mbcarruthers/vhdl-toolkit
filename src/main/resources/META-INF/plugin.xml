@@ -56,6 +56,17 @@
         <annotator
             language="VHDL"
             implementationClass="dev.vhdltoolkit.highlight.VhdlAnnotator"/>
+
+        <!-- Typing behaviour. There is no formatting model (no parser), so
+             indentation comes from a line indent provider instead. -->
+        <lineIndentProvider
+            implementation="dev.vhdltoolkit.editing.VhdlLineIndentProvider"/>
+        <typedHandler
+            implementation="dev.vhdltoolkit.editing.VhdlTypedHandler"/>
+        <enterHandlerDelegate
+            implementation="dev.vhdltoolkit.editing.VhdlEnterHandler"/>
+        <langCodeStyleSettingsProvider
+            implementation="dev.vhdltoolkit.editing.VhdlCodeStyleSettingsProvider"/>
         <colorSettingsPage
             implementation="dev.vhdltoolkit.highlight.VhdlColorSettingsPage"/>
         <platform.lsp.serverSupportProvider

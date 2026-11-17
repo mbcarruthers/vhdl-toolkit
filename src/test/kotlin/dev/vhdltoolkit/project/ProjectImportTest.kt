@@ -316,77 +316,49 @@ class ProjectImportTest {
         )
     }
 
-    // ---------------------------------------------------------------- Sigasi
-
-    /** The real mapping file from a Sigasi project. */
-    private fun writeSigasiMapping(): Path = write(
-        SigasiMappingReader.FILE_NAME,
-        """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <com.sigasi.hdt.shared.librarymapping.model:LibraryMappings
-            xmlns:com.sigasi.hdt.shared.librarymapping.model="com.sigasi.hdt.vhdl.scoping.librarymapping" Version="2">
-          <Mappings Location="Common Libraries/IEEE" Library="ieee"/>
-          <Mappings Location="Common Libraries/IEEE Synopsys" Library="ieee"/>
-          <Mappings Location="Common Libraries" Library="not mapped"/>
-          <Mappings Location="Common Libraries/STD" Library="std"/>
-          <Mappings Location="" Library="work"/>
-        </com.sigasi.hdt.shared.librarymapping.model:LibraryMappings
-        >
-        """.trimIndent(),
-    )
+    // ------------------------------------------------------- source scan
 
     @Test
-    fun sigasiRootMappingCollectsEverythingAndRenamesWork() {
-        val mapping = writeSigasiMapping()
-        write("src/counter.vhd")
-        write("tb/tb_counter.vhd")
+    fun scanCollectsEverySourceUnderTheRoot() {
+        write("src/a.vhd")
+        write("tb/b.vhdl")
+        write("deep/nested/c.vhd")
         write("readme.md", "# not vhdl")
 
-        val model = SigasiMappingReader.read(mapping)
-        assertEquals(listOf("work"), model.libraries.map { it.name })
-        assertEquals(2, model.fileCount)
-        assertTrue(model.warnings.any { it.message.contains("renamed") })
-
-        // The rename happens on write, so the emitted toml must not say "work".
-        val toml = VhdlLsTomlWriter.render(model, tmp.root.toPath())
-        assertFalse("'work' is rejected by VHDL-LS", toml.contains("work.files"))
-        assertTrue(toml.contains("${LibraryNames.DEFAULT_REPLACEMENT}.files"))
+        val model = SourceScanReader.read(tmp.root.toPath())
+        assertEquals(3, model.fileCount)
+        assertEquals(listOf(LibraryNames.DEFAULT_REPLACEMENT), model.libraries.map { it.name })
     }
 
     @Test
-    fun sigasiIgnoresBundledCommonLibraries() {
-        val mapping = writeSigasiMapping()
-        write("src/counter.vhd")
-        val model = SigasiMappingReader.read(mapping)
-        assertFalse("VHDL-LS ships its own ieee", model.libraries.any { it.name == "ieee" })
-        assertFalse("VHDL-LS ships its own std", model.libraries.any { it.name == "std" })
-    }
-
-    @Test
-    fun sigasiDeeperMappingWinsAndNotMappedExcludes() {
-        val mapping = write(
-            SigasiMappingReader.FILE_NAME,
-            """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <LibraryMappings Version="2">
-              <Mappings Location="" Library="work"/>
-              <Mappings Location="src/vendor" Library="vendor_lib"/>
-              <Mappings Location="src/legacy" Library="not mapped"/>
-            </LibraryMappings>
-            """.trimIndent(),
-        )
+    fun scanSkipsGeneratedAndHiddenTrees() {
         write("src/a.vhd")
-        write("src/vendor/v.vhd")
-        write("src/legacy/old.vhd")
+        write(".git/objects/x.vhd")
+        write("proj.runs/synth_1/gen.vhd")
+        write("proj.gen/sources_1/ip.vhd")
+        write("build/out.vhd")
+        write("vunit_out/test.vhd")
 
-        val model = SigasiMappingReader.read(mapping)
-        val byName = model.libraries.associateBy { it.name }
-        assertEquals(listOf("v.vhd"), byName.getValue("vendor_lib").files.map { it.fileName.toString() })
-        assertEquals(listOf("a.vhd"), byName.getValue("work").files.map { it.fileName.toString() })
-        assertFalse(
-            "'not mapped' folders are excluded",
-            model.libraries.flatMap { it.files }.any { it.fileName.toString() == "old.vhd" },
+        val found = SourceScanReader.read(tmp.root.toPath())
+            .libraries.flatMap { it.files }.map { it.fileName.toString() }
+        assertEquals(listOf("a.vhd"), found)
+    }
+
+    @Test
+    fun scanSaysItHadToGuess() {
+        write("src/a.vhd")
+        val model = SourceScanReader.read(tmp.root.toPath())
+        assertTrue(
+            "the user is told the library name was chosen, not read",
+            model.warnings.any { it.message.contains(LibraryNames.DEFAULT_REPLACEMENT) },
         )
+    }
+
+    @Test
+    fun scanOfAnEmptyTreeReportsRatherThanThrowing() {
+        val model = SourceScanReader.read(tmp.root.toPath())
+        assertTrue(model.libraries.isEmpty())
+        assertTrue(model.warnings.any { it.message.contains("No VHDL sources") })
     }
 
     // ----------------------------------------------------------- Toml writer

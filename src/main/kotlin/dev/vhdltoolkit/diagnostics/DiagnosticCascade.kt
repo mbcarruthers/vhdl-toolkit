@@ -1,6 +1,7 @@
 package dev.vhdltoolkit.diagnostics
 
 import dev.vhdltoolkit.lexer.VhdlSemanticClassifier
+import dev.vhdltoolkit.lexer.VhdlTokenizer
 
 /**
  * Separates root-cause diagnostics from the errors they caused.
@@ -116,16 +117,24 @@ object DiagnosticCascade {
 
         val verdicts = MutableList(diagnostics.size) { Verdict.ROOT }
 
-        // Rule 0: a syntax error derails the parser. Everything it reports
-        // afterwards is a guess about where to resume, so the positions are
-        // meaningless and only the first is worth showing. This is what
-        // compilers have always done: report the first parse error, then stop
-        // trusting the parse until it resynchronises.
+        // Rule 0: a syntax error derails the parser. What it reports next is a
+        // guess about where to resume, so those positions describe the
+        // recovery rather than the code.
+        //
+        // Suppression stops at the next design unit, which is where a parser
+        // realistically finds its footing again. Collapsing a whole file
+        // instead would hide a genuinely separate mistake in another unit
+        // until the first was fixed.
+        val unitStarts = designUnitStartLines(text)
         val parseErrors = diagnostics.indices
             .filter { diagnostics[it].severity == SEVERITY_ERROR && isParseError(diagnostics[it].message) }
             .sortedWith(compareBy({ diagnostics[it].range.start.line }, { diagnostics[it].range.start.character }))
-        for (index in parseErrors.drop(1)) {
-            verdicts[index] = Verdict.DERIVED
+
+        val firstPerUnit = HashSet<Int>()
+        val keptParseErrors = HashSet<Int>()
+        for (index in parseErrors) {
+            val unit = unitOf(diagnostics[index].range.start.line, unitStarts)
+            if (firstPerUnit.add(unit)) keptParseErrors.add(index) else verdicts[index] = Verdict.DERIVED
         }
         val hasParseError = parseErrors.isNotEmpty()
 
@@ -139,7 +148,7 @@ object DiagnosticCascade {
         if (brokenContextClause || hasParseError) {
             for (i in diagnostics.indices) {
                 if (onContextClause[i] && !hasParseError) continue
-                if (i == parseErrors.firstOrNull()) continue // the surviving root
+                if (i in keptParseErrors) continue // a surviving root
                 if (unresolvedSymbol[i] != null || isUnreliableWhenPoisoned(diagnostics[i].message)) {
                     verdicts[i] = Verdict.DERIVED
                 }
@@ -213,6 +222,56 @@ object DiagnosticCascade {
             out.getOrPut(line) { ArrayList() }.add(text.subSequence(span.start, span.end).toString())
         }
         return out
+    }
+
+    /** Keywords that begin a design unit, and so end a parser's confusion. */
+    private val DESIGN_UNIT_KEYWORDS = setOf("entity", "architecture", "package", "configuration", "context")
+
+    /**
+     * Lines on which a new design unit starts. Only a keyword that is first on
+     * its line counts, so `end entity` and references inside a statement do
+     * not split the file.
+     */
+    private fun designUnitStartLines(text: CharSequence): List<Int> {
+        val out = ArrayList<Int>()
+        var line = 0
+        var firstOnLine = true
+
+        for (token in VhdlTokenizer.tokenize(text)) {
+            when (token.kind) {
+                VhdlTokenizer.Kind.WHITESPACE -> {
+                    val newlines = (token.start until token.end).count { text[it] == '\n' }
+                    if (newlines > 0) {
+                        line += newlines
+                        firstOnLine = true
+                    }
+                }
+
+                VhdlTokenizer.Kind.LINE_COMMENT, VhdlTokenizer.Kind.BLOCK_COMMENT -> {
+                    line += (token.start until token.end).count { text[it] == '\n' }
+                }
+
+                else -> {
+                    if (firstOnLine) {
+                        val word = text.subSequence(token.start, token.end).toString().lowercase()
+                        if (token.kind == VhdlTokenizer.Kind.KEYWORD && word in DESIGN_UNIT_KEYWORDS) {
+                            out.add(line)
+                        }
+                        firstOnLine = false
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /** Index of the design unit containing [line]; -1 before the first. */
+    private fun unitOf(line: Int, unitStarts: List<Int>): Int {
+        var unit = -1
+        for ((index, start) in unitStarts.withIndex()) {
+            if (start <= line) unit = index else break
+        }
+        return unit
     }
 
     private fun computeLineStarts(text: CharSequence): List<Int> {

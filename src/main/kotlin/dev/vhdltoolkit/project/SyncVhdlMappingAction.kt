@@ -31,9 +31,9 @@ class SyncVhdlMappingAction : AnAction() {
                 .getNotificationGroup("VHDL Toolkit")
                 .createNotification(
                     "No importable project found",
-                    "Looked for a Vivado .xpr and a Sigasi ${SigasiMappingReader.FILE_NAME} " +
-                        "in the project root. Write ${VhdlMappingService.TOML_NAME} by hand, or open " +
-                        "the directory containing your .xpr as the project root.",
+                    "Looked for a Vivado .xpr, a project Tcl script, an HDL file list and " +
+                        "any VHDL sources under the project root, and found none. Open the " +
+                        "directory containing your design as the project root.",
                     NotificationType.WARNING,
                 )
                 .notify(project)

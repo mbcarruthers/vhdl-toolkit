@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
+import dev.vhdltoolkit.editing.VhdlBlockStructure.EndStyle
 import dev.vhdltoolkit.project.VhdlLspRestarter
 import javax.swing.JComponent
 
@@ -16,6 +17,9 @@ class VhdlSettingsConfigurable : Configurable {
 
     private var collapse: JBCheckBox? = null
     private var vivadoPath: TextFieldWithBrowseButton? = null
+    private var completeBlocks: JBCheckBox? = null
+    private var insertBegin: JBCheckBox? = null
+    private var endStyle: javax.swing.JComboBox<EndStyle>? = null
 
     override fun getDisplayName(): String = "VHDL Toolkit"
 
@@ -31,6 +35,23 @@ class VhdlSettingsConfigurable : Configurable {
                 null,
                 FileChooserDescriptorFactory.createSingleFolderDescriptor(),
             )
+        }
+
+        val complete = JBCheckBox("Insert the matching 'end' when a block is opened")
+            .also { completeBlocks = it }
+        val begin = JBCheckBox("Also insert 'begin' for architectures, processes and subprograms")
+            .also { insertBegin = it }
+        val endStyleCombo = javax.swing.JComboBox(
+            javax.swing.DefaultComboBoxModel(EndStyle.entries.toTypedArray()),
+        ).also { box ->
+            endStyle = box
+            box.renderer = com.intellij.ui.SimpleListCellRenderer.create("") { style ->
+                when (style) {
+                    EndStyle.BARE -> "end;"
+                    EndStyle.KEYWORD -> "end architecture;"
+                    EndStyle.KEYWORD_AND_NAME -> "end architecture rtl;"
+                }
+            }
         }
 
         val pathNote = JBLabel(
@@ -54,6 +75,10 @@ class VhdlSettingsConfigurable : Configurable {
             .addComponent(checkbox)
             .addComponentToRightColumn(explanation)
             .addSeparator()
+            .addComponent(complete)
+            .addComponent(begin)
+            .addLabeledComponent("Closing style:", endStyleCombo)
+            .addSeparator()
             .addLabeledComponent("Vivado installation:", pathField)
             .addComponentToRightColumn(pathNote)
             .addComponentFillVertically(javax.swing.JPanel(), 0)
@@ -63,13 +88,19 @@ class VhdlSettingsConfigurable : Configurable {
     override fun isModified(): Boolean {
         val settings = VhdlSettings.getInstance()
         return collapse?.isSelected != settings.collapseCascadedDiagnostics ||
-            vivadoPath?.text.orEmpty() != settings.vivadoPath
+            vivadoPath?.text.orEmpty() != settings.vivadoPath ||
+            completeBlocks?.isSelected != settings.completeBlocks ||
+            insertBegin?.isSelected != settings.insertBegin ||
+            (endStyle?.selectedItem as? EndStyle)?.name != settings.endStyle
     }
 
     override fun apply() {
         val settings = VhdlSettings.getInstance()
         settings.collapseCascadedDiagnostics = collapse?.isSelected ?: true
         settings.vivadoPath = vivadoPath?.text.orEmpty().trim()
+        settings.completeBlocks = completeBlocks?.isSelected ?: true
+        settings.insertBegin = insertBegin?.isSelected ?: true
+        settings.endStyle = (endStyle?.selectedItem as? EndStyle)?.name ?: EndStyle.KEYWORD_AND_NAME.name
         // The proxy is chosen at launch, so the change needs a server restart.
         for (project in ProjectManager.getInstance().openProjects) {
             VhdlLspRestarter.restart(project)
@@ -80,10 +111,16 @@ class VhdlSettingsConfigurable : Configurable {
         val settings = VhdlSettings.getInstance()
         collapse?.isSelected = settings.collapseCascadedDiagnostics
         vivadoPath?.text = settings.vivadoPath
+        completeBlocks?.isSelected = settings.completeBlocks
+        insertBegin?.isSelected = settings.insertBegin
+        endStyle?.selectedItem = settings.endStyleEnum
     }
 
     override fun disposeUIResources() {
         collapse = null
         vivadoPath = null
+        completeBlocks = null
+        insertBegin = null
+        endStyle = null
     }
 }
