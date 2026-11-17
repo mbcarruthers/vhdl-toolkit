@@ -85,6 +85,21 @@ object DiagnosticCascade {
     private fun isUnreliableWhenPoisoned(message: String): Boolean =
         UNRELIABLE_WHEN_POISONED.any { it.containsMatchIn(message) }
 
+    /**
+     * A parser complaining about what it wanted to see. After the first of
+     * these the parser is no longer where it thinks it is, so the rest
+     * describe its recovery attempts rather than anything about the code.
+     */
+    private val PARSE_ERROR_PATTERNS = listOf(
+        Regex("""^\s*Expected\b"""),
+        Regex("""[Uu]nexpected (?:token|character|end of file)"""),
+        Regex("""[Ss]yntax error"""),
+        Regex("""[Mm]issing ['`]"""),
+    )
+
+    fun isParseError(message: String): Boolean =
+        PARSE_ERROR_PATTERNS.any { it.containsMatchIn(message) }
+
     /** A context clause: the statements whose failure poisons a whole package. */
     private val CONTEXT_CLAUSE = Regex("""^\s*(library|use|context)\b""", RegexOption.IGNORE_CASE)
 
@@ -101,14 +116,30 @@ object DiagnosticCascade {
 
         val verdicts = MutableList(diagnostics.size) { Verdict.ROOT }
 
+        // Rule 0: a syntax error derails the parser. Everything it reports
+        // afterwards is a guess about where to resume, so the positions are
+        // meaningless and only the first is worth showing. This is what
+        // compilers have always done: report the first parse error, then stop
+        // trusting the parse until it resynchronises.
+        val parseErrors = diagnostics.indices
+            .filter { diagnostics[it].severity == SEVERITY_ERROR && isParseError(diagnostics[it].message) }
+            .sortedWith(compareBy({ diagnostics[it].range.start.line }, { diagnostics[it].range.start.character }))
+        for (index in parseErrors.drop(1)) {
+            verdicts[index] = Verdict.DERIVED
+        }
+        val hasParseError = parseErrors.isNotEmpty()
+
         // Rule 1: a broken context clause poisons every name it would import,
-        // and makes "unused" judgements meaningless for the whole file.
+        // and makes "unused" judgements meaningless for the whole file. A
+        // failed parse does the same, and for the same reason: nothing
+        // resolved from a file that did not parse can be relied on.
         val brokenContextClause = diagnostics.indices.any {
             onContextClause[it] && diagnostics[it].severity == SEVERITY_ERROR
         }
-        if (brokenContextClause) {
+        if (brokenContextClause || hasParseError) {
             for (i in diagnostics.indices) {
-                if (onContextClause[i]) continue
+                if (onContextClause[i] && !hasParseError) continue
+                if (i == parseErrors.firstOrNull()) continue // the surviving root
                 if (unresolvedSymbol[i] != null || isUnreliableWhenPoisoned(diagnostics[i].message)) {
                     verdicts[i] = Verdict.DERIVED
                 }

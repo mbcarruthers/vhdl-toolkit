@@ -5,6 +5,7 @@ import dev.vhdltoolkit.diagnostics.DiagnosticCascade.Position
 import dev.vhdltoolkit.diagnostics.DiagnosticCascade.Range
 import dev.vhdltoolkit.diagnostics.DiagnosticCascade.Verdict
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -236,6 +237,94 @@ class DiagnosticCascadeTest {
         )
         val analysis = DiagnosticCascade.analyze(src, diagnostics)
         assertEquals("only an error poisons", 2, analysis.rootCount)
+    }
+
+    /**
+     * A real file with one missing character: `STD_LOGIC_VECTOR(3 downto )`.
+     * The port list never closes, so the parser reports five more things it
+     * expected at positions that mean nothing. Only the first is real.
+     */
+    @Test
+    fun syntaxErrorCascadeCollapsesToTheFirstParseError() {
+        val src = """
+            library IEEE;
+            use IEEE.STD_LOGIC_1164.ALL;
+
+            entity mini_alu4 is
+                Port(
+                    S0 : in STD_LOGIC;
+                    A  : in STD_LOGIC_VECTOR(3 downto 0);
+                    Y  : out STD_LOGIC_VECTOR(3 downto );
+                );
+            end entity;
+
+            ARCHITECTURE Behavioral OF mini_alu4 IS
+                subtype T2 is std_logic_vector(2 downto 0);
+            BEGIN
+                case T2'(S1 & S0) IS
+                    WHEN "01" =>
+                        Y <= A AND B;
+                END case;
+            END Behavior;
+        """.trimIndent()
+
+        val diagnostics = listOf(
+            diag(7, "Expected '{identifier}'"),
+            diag(8, "Expected 'type', 'subtype', 'component', 'signal', 'variable', 'use' or 'alias'"),
+            diag(12, "Expected 'type', 'subtype', 'component', 'signal', 'variable', 'use' or 'alias'"),
+            diag(14, "Expected 'generate'"),
+            diag(16, "Expected 'end'"),
+            diag(17, "Expected 'library', 'use', 'context', 'entity', 'architecture' or 'package'"),
+        )
+
+        val analysis = DiagnosticCascade.analyze(src, diagnostics)
+        assertEquals("one real syntax error", 1, analysis.rootCount)
+        assertEquals("and it is the earliest", Verdict.ROOT, analysis.verdicts[0])
+        assertEquals(5, analysis.derivedCount)
+    }
+
+    @Test
+    fun theEarliestParseErrorSurvivesRegardlessOfReportingOrder() {
+        val src = "entity e is\n  port ( a : in bit );\nend entity;\n"
+        // Deliberately out of document order, as a server may emit them.
+        val diagnostics = listOf(
+            diag(2, "Expected 'end'"),
+            diag(0, "Expected '{identifier}'"),
+            diag(1, "Expected 'generate'"),
+        )
+        val analysis = DiagnosticCascade.analyze(src, diagnostics)
+        assertEquals(1, analysis.rootCount)
+        assertEquals("line 0 is the root", Verdict.ROOT, analysis.verdicts[1])
+    }
+
+    @Test
+    fun nameErrorsAreNotTrustedAfterAFailedParse() {
+        val src = "entity e is\n  port ( y : out bit );\nend entity;\n"
+        val diagnostics = listOf(
+            diag(1, "Expected '{identifier}'"),
+            diag(2, "No declaration of 'B'"),
+            diag(2, "Unused declaration of generic 'W'", DiagnosticCascade.SEVERITY_WARNING),
+        )
+        val analysis = DiagnosticCascade.analyze(src, diagnostics)
+        assertEquals("resolution means nothing without a parse", 1, analysis.rootCount)
+        assertEquals(Verdict.ROOT, analysis.verdicts[0])
+    }
+
+    @Test
+    fun parseErrorShapesAreRecognised() {
+        assertTrue(DiagnosticCascade.isParseError("Expected 'end'"))
+        assertTrue(DiagnosticCascade.isParseError("Unexpected token ')'"))
+        assertTrue(DiagnosticCascade.isParseError("Syntax error near 'downto'"))
+        assertFalse("a name error is not a parse error", DiagnosticCascade.isParseError("No declaration of 'x'"))
+        assertFalse(DiagnosticCascade.isParseError("Unused declaration of generic 'W'"))
+    }
+
+    @Test
+    fun aSingleSyntaxErrorIsUntouched() {
+        val src = "entity e is\nend entity;\n"
+        val analysis = DiagnosticCascade.analyze(src, listOf(diag(0, "Expected '{identifier}'")))
+        assertEquals(1, analysis.rootCount)
+        assertEquals(0, analysis.derivedCount)
     }
 
     @Test
