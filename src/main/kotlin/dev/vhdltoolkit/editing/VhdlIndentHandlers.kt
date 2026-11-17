@@ -1,6 +1,8 @@
 package dev.vhdltoolkit.editing
 
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
+import com.intellij.codeInsight.editorActions.enter.EnterHandlerDelegate
+import com.intellij.codeInsight.editorActions.enter.EnterHandlerDelegateAdapter
 import com.intellij.lang.Language
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.editor.Document
@@ -123,12 +125,16 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
  * Nothing is inserted if the construct already has a matching `end` ahead of
  * the caret, so editing existing code does not accumulate duplicates.
  */
-class VhdlEnterHandler : com.intellij.codeInsight.editorActions.enter.EnterHandlerDelegateAdapter() {
+class VhdlEnterHandler : EnterHandlerDelegateAdapter() {
 
-    override fun postProcessEnter(file: PsiFile, editor: Editor, dataContext: DataContext): Result {
-        if (file.language !is VhdlLanguage) return Result.Continue
+    override fun postProcessEnter(
+        file: PsiFile,
+        editor: Editor,
+        dataContext: DataContext,
+    ): EnterHandlerDelegate.Result {
+        if (file.language !is VhdlLanguage) return EnterHandlerDelegate.Result.Continue
         val settings = VhdlSettings.getInstance()
-        if (!settings.completeBlocks) return Result.Continue
+        if (!settings.completeBlocks) return EnterHandlerDelegate.Result.Continue
 
         val project = file.project
         val document = editor.document
@@ -140,12 +146,12 @@ class VhdlEnterHandler : com.intellij.codeInsight.editorActions.enter.EnterHandl
             indentSize = indentSize(project, document),
             endStyle = settings.endStyleEnum,
             insertBegin = settings.insertBegin,
-        ) ?: return Result.Continue
+        ) ?: return EnterHandlerDelegate.Result.Continue
 
         document.insertString(caret, completion.textToInsert)
         editor.caretModel.moveToOffset(caret + completion.caretOffsetInInsertion)
         PsiDocumentManager.getInstance(project).commitDocument(document)
-        return Result.Continue
+        return EnterHandlerDelegate.Result.Continue
     }
 
     private fun indentSize(project: Project, document: Document): Int =
