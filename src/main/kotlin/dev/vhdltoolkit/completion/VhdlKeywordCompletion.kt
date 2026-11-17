@@ -105,7 +105,11 @@ object VhdlKeywordCompletion {
             out += TYPES.map { Suggestion(it, description = "standard type") }
         }
 
-        return out.distinctBy { it.text.lowercase() }
+        // A skeleton shares its name with the plain keyword, so both must
+        // survive: picking `process` from the list should be able to mean
+        // either the word or the whole block. They are told apart in the
+        // popup by the skeleton's description and tail marker.
+        return out.distinctBy { it.text.lowercase() to (it.template != null) }
     }
 
     // --------------------------------------------------------- vocabulary

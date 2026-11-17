@@ -127,10 +127,19 @@ class VhdlKeywordCompletionTest {
     }
 
     @Test
-    fun suggestionsAreUnique() {
+    fun aKeywordAndItsSkeletonBothSurvive() {
+        val (text, offset) = at("architecture rtl of foo is\nbegin\n    |")
+        val named = VhdlKeywordCompletion.suggestionsFor(text, offset).filter { it.text == "process" }
+        assertEquals("the bare keyword and the block", 2, named.size)
+        assertEquals(1, named.count { it.template == null })
+        assertEquals(1, named.count { it.template != null })
+    }
+
+    @Test
+    fun noExactDuplicatesAreOffered() {
         val all = VhdlKeywordCompletion
             .suggestionsFor("architecture a of b is\nbegin\n    process (c)\n    begin\n        ", 70)
-            .map { it.text.lowercase() }
+            .map { it.text.lowercase() to (it.template != null) }
         assertEquals(all.size, all.distinct().size)
     }
 }
