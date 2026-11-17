@@ -158,7 +158,7 @@ class VhdlKeywordCompletionTest {
 
     @Test
     fun operatorsThatAreReservedWordsAreOffered() {
-        val seq = words("architecture a of b is\nbegin\n    process (c)\n    begin\n        ")
+        val seq = words("architecture a of b is\nbegin\n    process (c)\n    begin\n        |")
         assertTrue(seq.containsAll(setOf("and", "or", "not", "xor", "nand", "mod", "sll")))
     }
 
@@ -166,7 +166,7 @@ class VhdlKeywordCompletionTest {
     fun rangeVocabularyIsOfferedWhereASubtypeCanAppear() {
         assertTrue(words("entity foo is\n    port (\n        a : in std_logic_vector(3 |").contains("downto"))
         assertTrue("range" in words("architecture rtl of foo is\n    subtype s |"))
-        assertTrue("others" in words("architecture a of b is\nbegin\n    process (c)\n    begin\n        "))
+        assertTrue("others" in words("architecture a of b is\nbegin\n    process (c)\n    begin\n        |"))
     }
 
     @Test
@@ -177,6 +177,6 @@ class VhdlKeywordCompletionTest {
 
     @Test
     fun aPortMapIsOfferedInAConcurrentBody() {
-        assertTrue("map" in words("architecture rtl of foo is\nbegin\n    "))
+        assertTrue("map" in words("architecture rtl of foo is\nbegin\n    |"))
     }
 }
