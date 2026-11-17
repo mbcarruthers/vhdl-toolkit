@@ -245,7 +245,7 @@ class DiagnosticCascadeTest {
      * expected at positions that mean nothing. Only the first is real.
      */
     @Test
-    fun syntaxErrorCascadeCollapsesToTheFirstParseError() {
+    fun syntaxErrorCascadeCollapsesToTheFirstParseErrorOfEachDesignUnit() {
         val src = """
             library IEEE;
             use IEEE.STD_LOGIC_1164.ALL;
@@ -278,9 +278,14 @@ class DiagnosticCascadeTest {
         )
 
         val analysis = DiagnosticCascade.analyze(src, diagnostics)
-        assertEquals("one real syntax error", 1, analysis.rootCount)
-        assertEquals("and it is the earliest", Verdict.ROOT, analysis.verdicts[0])
-        assertEquals(5, analysis.derivedCount)
+        // One per design unit: the entity's broken port list, and the first
+        // thing that fails in the architecture. Collapsing to a single error
+        // for the whole file would hide an independent mistake.
+        assertEquals(2, analysis.rootCount)
+        assertEquals("the entity's error is the earliest there", Verdict.ROOT, analysis.verdicts[0])
+        assertEquals("the second entity error is fallout", Verdict.DERIVED, analysis.verdicts[1])
+        assertEquals("the architecture reports its own first failure", Verdict.ROOT, analysis.verdicts[2])
+        assertEquals(4, analysis.derivedCount)
     }
 
     @Test

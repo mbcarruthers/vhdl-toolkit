@@ -90,9 +90,9 @@ class VhdlBlockStructureTest {
                             y <= '1';
             |
         """.trimIndent()
-        assertEquals("statements sit inside the alternative", 28, indent(src))
-        assertEquals("the next alternative lines up with the previous", 24, indent(src, "when"))
-        assertEquals("end case closes the case", 20, indent(src, "end"))
+        assertEquals("statements sit inside the alternative", 16, indent(src))
+        assertEquals("the next alternative lines up with the previous", 12, indent(src, "when"))
+        assertEquals("end case closes the case", 8, indent(src, "end"))
     }
 
     @Test

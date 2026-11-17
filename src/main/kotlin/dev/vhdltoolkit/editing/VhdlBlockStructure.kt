@@ -101,8 +101,11 @@ object VhdlBlockStructure {
             val word = token.lower
 
             if (token.kind == VhdlTokenizer.Kind.LPAREN) {
+                // Contents indent from the line holding the paren, not from
+                // the paren's own column: `port (` should put its interface
+                // elements one level in, not aligned under the bracket.
                 frames.add(
-                    Frame(Construct.PAREN, null, null, columnOf(text, token.start), token.start),
+                    Frame(Construct.PAREN, null, null, lineIndentOf(text, token.start), token.start),
                 )
                 i++
                 continue
@@ -433,6 +436,19 @@ object VhdlBlockStructure {
 
     private fun onSameLine(text: CharSequence, a: Int, b: Int): Boolean =
         (a until b).none { text[it] == '\n' }
+
+    /** Width of the leading whitespace on the line containing [offset]. */
+    private fun lineIndentOf(text: CharSequence, offset: Int): Int {
+        var start = offset
+        while (start > 0 && text[start - 1] != '\n') start--
+        var width = 0
+        var i = start
+        while (i < text.length && (text[i] == ' ' || text[i] == '\t')) {
+            width++
+            i++
+        }
+        return width
+    }
 
     private fun columnOf(text: CharSequence, offset: Int): Int {
         var column = 0
