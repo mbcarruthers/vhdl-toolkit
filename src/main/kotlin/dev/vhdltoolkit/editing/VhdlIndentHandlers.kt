@@ -8,7 +8,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
-import com.intellij.psi.codeStyle.CodeStyle
+import com.intellij.application.options.CodeStyle
 import com.intellij.psi.codeStyle.lineIndent.LineIndentProvider
 import dev.vhdltoolkit.VhdlLanguage
 import dev.vhdltoolkit.settings.VhdlSettings
