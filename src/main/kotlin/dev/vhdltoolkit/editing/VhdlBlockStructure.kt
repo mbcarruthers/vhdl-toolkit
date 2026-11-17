@@ -51,6 +51,16 @@ object VhdlBlockStructure {
             get() = this == ENTITY || this == ARCHITECTURE || this == PACKAGE ||
                 this == PACKAGE_BODY || this == CONFIGURATION || this == CONTEXT
 
+        /**
+         * Constructs the language lets you close with a plain `end;`.
+         * Everywhere else the keyword is mandatory, which makes it a reliable
+         * way to tell which construct a given `end` belongs to.
+         */
+        val allowsBareEnd: Boolean
+            get() = this == ENTITY || this == ARCHITECTURE || this == PACKAGE ||
+                this == PACKAGE_BODY || this == SUBPROGRAM || this == CONFIGURATION ||
+                this == CONTEXT
+
         /** Constructs whose declarative part is separated from the body by `begin`. */
         val takesBegin: Boolean
             get() = this == ARCHITECTURE || this == PROCESS || this == SUBPROGRAM ||
@@ -277,17 +287,67 @@ object VhdlBlockStructure {
     fun isClosedAfter(text: CharSequence, frame: Frame, offset: Int): Boolean {
         val tokens = significantTokens(text, text.length).filter { it.start >= offset }
         var depth = 0
-        for (token in tokens) {
+
+        for ((index, token) in tokens.withIndex()) {
             if (token.kind != VhdlTokenizer.Kind.KEYWORD) continue
-            when (token.lower) {
-                "end" -> {
-                    if (depth == 0) return true
-                    depth--
+            when {
+                token.lower == "end" -> {
+                    if (depth > 0) {
+                        depth--
+                        continue
+                    }
+                    // The first unmatched `end` either closes this frame or
+                    // an enclosing one. Which it is matters: in a real file
+                    // there is nearly always an `end process;` or
+                    // `end architecture;` further down, and treating that as
+                    // proof of closure means never completing anything.
+                    return endBelongsTo(frame, tokens.getOrNull(index + 1))
                 }
-                in OPENING_KEYWORDS -> depth++
+
+                token.lower in OPENING_KEYWORDS -> depth++
             }
         }
         return false
+    }
+
+    /**
+     * Whether an `end` followed by [next] could be closing [frame].
+     *
+     * VHDL names the construct in most closers — `end if;`, `end process;`,
+     * `end component;` are all mandatory forms — so the keyword identifies
+     * the owner. A bare `end;` is only legal for entities, architectures,
+     * packages and subprograms, and is ambiguous among those.
+     */
+    private fun endBelongsTo(frame: Frame, next: Tok?): Boolean {
+        val keyword = next?.takeIf { it.kind == VhdlTokenizer.Kind.KEYWORD }?.lower
+
+        val expected = when (frame.construct) {
+            Construct.ENTITY -> "entity"
+            Construct.ARCHITECTURE -> "architecture"
+            Construct.PACKAGE, Construct.PACKAGE_BODY -> "package"
+            Construct.COMPONENT -> "component"
+            Construct.CONFIGURATION -> "configuration"
+            Construct.CONTEXT -> "context"
+            Construct.PROCESS -> "process"
+            Construct.BLOCK -> "block"
+            Construct.IF -> "if"
+            Construct.CASE -> "case"
+            Construct.LOOP -> "loop"
+            Construct.GENERATE -> "generate"
+            Construct.RECORD -> "record"
+            Construct.UNITS -> "units"
+            Construct.PROTECTED -> "protected"
+            Construct.SUBPROGRAM -> null // `end function f;` or just `end;`
+            Construct.WHEN, Construct.PAREN -> return true
+        }
+
+        if (keyword == null) {
+            // A bare `end;` cannot close a construct whose keyword the
+            // language requires, so it must belong to something outside.
+            return frame.construct.allowsBareEnd
+        }
+        if (expected == null) return keyword == "function" || keyword == "procedure"
+        return keyword == expected
     }
 
     // ------------------------------------------------------------ internals

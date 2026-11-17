@@ -80,6 +80,40 @@ class VhdlBlockCompletionTest {
         )
     }
 
+    /**
+     * The failure that made the feature look dead: a real file always has an
+     * enclosing `end process;` or `end architecture;` further down, and
+     * treating the first `end` found as proof of closure meant nothing was
+     * ever completed.
+     */
+    @Test
+    fun anEnclosingEndDoesNotCountAsThisBlockBeingClosed() {
+        val result = complete(
+            "architecture a of b is\nbegin\n    process (clk)\n    begin\n        if x then\n            |\n    end process;\nend architecture a;",
+        )
+        assertEquals(true, result?.contains("end if;"))
+    }
+
+    @Test
+    fun aMatchingEndFurtherDownDoesStopIt() {
+        assertNull(
+            "this if really is closed already",
+            complete(
+                "architecture a of b is\nbegin\n    process (clk)\n    begin\n        if x then\n            |\n        end if;\n    end process;\nend architecture a;",
+            ),
+        )
+    }
+
+    @Test
+    fun aBareEndCannotCloseAConstructThatRequiresItsKeyword() {
+        // `end;` is legal for an architecture but never for an if statement,
+        // so it cannot be the one closing this block.
+        val result = complete(
+            "architecture a of b is\nbegin\n    if x then\n        |\nend;",
+        )
+        assertEquals(true, result?.contains("end if;"))
+    }
+
     @Test
     fun nothingHappensMidLine() {
         assertNull(

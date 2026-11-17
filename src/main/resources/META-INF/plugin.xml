@@ -67,6 +67,12 @@
             implementation="dev.vhdltoolkit.editing.VhdlEnterHandler"/>
         <langCodeStyleSettingsProvider
             implementation="dev.vhdltoolkit.editing.VhdlCodeStyleSettingsProvider"/>
+
+        <!-- Keywords and skeletons. The language server completes names it
+             has seen; this completes the language itself. -->
+        <completion.contributor
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.completion.VhdlCompletionContributor"/>
         <colorSettingsPage
             implementation="dev.vhdltoolkit.highlight.VhdlColorSettingsPage"/>
         <platform.lsp.serverSupportProvider
