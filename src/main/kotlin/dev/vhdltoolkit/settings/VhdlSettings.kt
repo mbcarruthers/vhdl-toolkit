@@ -20,6 +20,13 @@ class VhdlSettings : PersistentStateComponent<VhdlSettings> {
     var collapseCascadedDiagnostics: Boolean = true
 
     /**
+     * Hold diagnostics until typing stops, as the IDE's own analyser does.
+     * On by default: the server reports on every keystroke, so without this
+     * half-written code is flagged as broken while it is being written.
+     */
+    var debounceDiagnostics: Boolean = true
+
+    /**
      * Explicit Vivado installation directory. Empty means "work it out":
      * `XILINX_VIVADO`, then `vivado` on `PATH`, then the usual locations.
      * Needed because a GUI-launched IDE does not read `.bashrc`.

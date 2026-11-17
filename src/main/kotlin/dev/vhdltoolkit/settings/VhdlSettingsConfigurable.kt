@@ -16,6 +16,7 @@ import javax.swing.JComponent
 class VhdlSettingsConfigurable : Configurable {
 
     private var collapse: JBCheckBox? = null
+    private var debounce: JBCheckBox? = null
     private var vivadoPath: TextFieldWithBrowseButton? = null
     private var completeBlocks: JBCheckBox? = null
     private var insertBegin: JBCheckBox? = null
@@ -26,6 +27,16 @@ class VhdlSettingsConfigurable : Configurable {
     override fun createComponent(): JComponent {
         val checkbox = JBCheckBox("Collapse errors caused by another error in the same file")
             .also { collapse = it }
+
+        val holdBox = JBCheckBox("Wait until typing stops before reporting problems")
+            .also { debounce = it }
+
+        val holdNote = JBLabel(
+            "<html>The language server re-checks the file on every keystroke, so an unfinished " +
+                "line is reported as an error while it is still being written. When enabled, " +
+                "problems are shown once typing pauses, as the IDE does for its own " +
+                "languages.</html>",
+        ).apply { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND }
 
         val pathField = TextFieldWithBrowseButton().also { field ->
             vivadoPath = field
@@ -72,6 +83,9 @@ class VhdlSettingsConfigurable : Configurable {
         }
 
         return FormBuilder.createFormBuilder()
+            .addComponent(holdBox)
+            .addComponentToRightColumn(holdNote)
+            .addSeparator()
             .addComponent(checkbox)
             .addComponentToRightColumn(explanation)
             .addSeparator()
@@ -88,6 +102,7 @@ class VhdlSettingsConfigurable : Configurable {
     override fun isModified(): Boolean {
         val settings = VhdlSettings.getInstance()
         return collapse?.isSelected != settings.collapseCascadedDiagnostics ||
+            debounce?.isSelected != settings.debounceDiagnostics ||
             vivadoPath?.text.orEmpty() != settings.vivadoPath ||
             completeBlocks?.isSelected != settings.completeBlocks ||
             insertBegin?.isSelected != settings.insertBegin ||
@@ -97,6 +112,7 @@ class VhdlSettingsConfigurable : Configurable {
     override fun apply() {
         val settings = VhdlSettings.getInstance()
         settings.collapseCascadedDiagnostics = collapse?.isSelected ?: true
+        settings.debounceDiagnostics = debounce?.isSelected ?: true
         settings.vivadoPath = vivadoPath?.text.orEmpty().trim()
         settings.completeBlocks = completeBlocks?.isSelected ?: true
         settings.insertBegin = insertBegin?.isSelected ?: true
@@ -110,6 +126,7 @@ class VhdlSettingsConfigurable : Configurable {
     override fun reset() {
         val settings = VhdlSettings.getInstance()
         collapse?.isSelected = settings.collapseCascadedDiagnostics
+        debounce?.isSelected = settings.debounceDiagnostics
         vivadoPath?.text = settings.vivadoPath
         completeBlocks?.isSelected = settings.completeBlocks
         insertBegin?.isSelected = settings.insertBegin
@@ -118,6 +135,7 @@ class VhdlSettingsConfigurable : Configurable {
 
     override fun disposeUIResources() {
         collapse = null
+        debounce = null
         vivadoPath = null
         completeBlocks = null
         insertBegin = null

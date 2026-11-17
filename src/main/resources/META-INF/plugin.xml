@@ -20,6 +20,10 @@
         to derive <code>vhdl_ls.toml</code> from it — filesets, per-file libraries and the project
         default library included — then keeps it in step as the project file changes. Run it again
         any time from <b>Tools | Sync VHDL Library Mapping</b>.</p>
+        <p><b>Problems wait for you to stop typing.</b> The language server re-checks the file on
+        every keystroke, so an unfinished line is reported as an error while it is still being
+        written. Diagnostics are held until typing pauses, the way the IDE treats its own
+        languages.</p>
         <p><b>Cascaded errors are collapsed.</b> A typo in a <code>use</code> clause makes every
         name from that package unresolvable, which can turn one mistake into dozens of errors and
         bury the real one. The plugin reconstructs the causal chain and reports only the root
