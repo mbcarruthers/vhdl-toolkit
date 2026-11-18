@@ -83,8 +83,8 @@ class VhdlDesignUnitsTest {
 
     @Test
     fun aSelectedNameArrivesAsOneToken() {
-        // The tokenizer folds `work.counter` into a single identifier, so the
-        // library has to be split back out rather than read as its own token.
+        // A basic identifier stops at the dot, so a selected name arrives as
+        // alternating identifier and `.` tokens and has to be walked.
         val unit = scan("u1 : entity mylib.sub.counter port map (a => b);")
             .single { it.kind == Kind.INSTANTIATION }
         assertEquals("counter", unit.target)

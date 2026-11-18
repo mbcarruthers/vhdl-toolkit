@@ -136,27 +136,45 @@ object VhdlDesignUnits {
      */
     private fun instantiation(tokens: List<Tok>, i: Int): Unit? {
         val label = tokens.getOrNull(i - 2)?.takeIf { it.isIdentifier } ?: return null
-        val named = tokens.getOrNull(i + 1)?.takeIf { it.isIdentifier } ?: return null
+        val named = selectedName(tokens, i + 1) ?: return null
 
         return Unit(
             kind = Kind.INSTANTIATION,
             name = label.text,
-            target = simpleNameOf(named.text),
-            library = libraryOf(named.text),
+            target = named.name,
+            library = named.library,
             nameOffset = label.start,
             keywordOffset = label.start,
         )
     }
 
     /**
-     * The tokenizer treats a selected name as one identifier, so
-     * `work.counter` arrives whole rather than as three tokens.
+     * @param library the prefix directly before the simple name, or null when
+     *   the name was written bare.
+     * @param after index of the first token past the name.
      */
-    private fun simpleNameOf(name: String): String = name.substringAfterLast('.')
+    private class Selected(val name: String, val library: String?, val after: Int)
 
-    private fun libraryOf(name: String): String? =
-        name.substringBeforeLast('.', missingDelimiterValue = "").substringAfterLast('.')
-            .takeIf { it.isNotEmpty() }
+    /**
+     * Reads a possibly-qualified name such as `counter`, `work.counter` or
+     * `mylib.sub.counter` starting at [from].
+     *
+     * A basic identifier stops at the dot, so a selected name arrives as
+     * alternating identifier and `.` tokens rather than as one.
+     */
+    private fun selectedName(tokens: List<Tok>, from: Int): Selected? {
+        var at = from
+        var previous: String? = null
+        var current = tokens.getOrNull(at)?.takeIf { it.isIdentifier } ?: return null
+        at++
+        while (tokens.getOrNull(at)?.text == "." ) {
+            val next = tokens.getOrNull(at + 1)?.takeIf { it.isIdentifier } ?: break
+            previous = current.text
+            current = next
+            at += 2
+        }
+        return Selected(current.text, previous, at)
+    }
 
     /**
      * `u1 : counter port map (...)` — a component instantiation written
@@ -172,15 +190,16 @@ object VhdlDesignUnits {
         for (i in tokens.indices) {
             if (tokens[i].text != ":") continue
             val label = tokens.getOrNull(i - 1)?.takeIf { it.isIdentifier } ?: continue
-            val target = tokens.getOrNull(i + 1)?.takeIf { it.isIdentifier } ?: continue
+            val first = tokens.getOrNull(i + 1)?.takeIf { it.isIdentifier } ?: continue
             // The explicit forms are already handled above.
-            if (target.text in setOf("entity", "component", "configuration")) continue
-            if (!mapFollows(tokens, i + 2)) continue
+            if (first.text in setOf("entity", "component", "configuration")) continue
+            val target = selectedName(tokens, i + 1) ?: continue
+            if (!mapFollows(tokens, target.after)) continue
             out += Unit(
                 kind = Kind.INSTANTIATION,
                 name = label.text,
-                target = simpleNameOf(target.text),
-                library = libraryOf(target.text),
+                target = target.name,
+                library = target.library,
                 nameOffset = label.start,
                 keywordOffset = label.start,
             )
