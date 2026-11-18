@@ -69,6 +69,12 @@
             implementation="dev.vhdltoolkit.editing.VhdlTypedHandler"/>
         <enterHandlerDelegate
             implementation="dev.vhdltoolkit.editing.VhdlEnterHandler"/>
+        <lang.smartEnterProcessor
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.editing.VhdlSmartEnterProcessor"/>
+        <codeInsight.lineMarkerProvider
+            language="VHDL"
+            implementationClass="dev.vhdltoolkit.navigation.VhdlLineMarkerProvider"/>
         <langCodeStyleSettingsProvider
             implementation="dev.vhdltoolkit.editing.VhdlCodeStyleSettingsProvider"/>
 
