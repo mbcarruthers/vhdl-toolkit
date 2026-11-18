@@ -1,7 +1,7 @@
 package dev.vhdltoolkit.editing
 
 import com.intellij.application.options.CodeStyle
-import com.intellij.lang.SmartEnterProcessor
+import com.intellij.codeInsight.editorActions.smartEnter.SmartEnterProcessor
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
