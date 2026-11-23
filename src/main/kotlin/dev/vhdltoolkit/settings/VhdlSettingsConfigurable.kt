@@ -6,6 +6,7 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
+import dev.vhdltoolkit.editing.VhdlBlockCompletion
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import dev.vhdltoolkit.editing.VhdlBlockStructure.EndStyle
@@ -21,6 +22,7 @@ class VhdlSettingsConfigurable : Configurable {
     private var completeBlocks: JBCheckBox? = null
     private var insertBegin: JBCheckBox? = null
     private var whenIndent: javax.swing.JComboBox<Boolean>? = null
+    private val caretSpots = LinkedHashMap<String, javax.swing.JComboBox<VhdlBlockCompletion.CaretSpot>>()
     private var endStyle: javax.swing.JComboBox<EndStyle>? = null
 
     override fun getDisplayName(): String = "VHDL Toolkit"
@@ -65,6 +67,26 @@ class VhdlSettingsConfigurable : Configurable {
                 }
             }
         }
+
+        fun caretCombo(label: String): javax.swing.JComboBox<VhdlBlockCompletion.CaretSpot> =
+            javax.swing.JComboBox(
+                javax.swing.DefaultComboBoxModel(VhdlBlockCompletion.CaretSpot.values()),
+            ).also { box ->
+                caretSpots[label] = box
+                box.renderer = com.intellij.ui.SimpleListCellRenderer.create("") { spot ->
+                    if (spot == VhdlBlockCompletion.CaretSpot.BODY) {
+                        "after begin, in the body"
+                    } else {
+                        "before begin, in the declarations"
+                    }
+                }
+            }
+
+        val caretNote = JBLabel(
+            "<html>Where the caret lands once a block is completed. The default follows what " +
+                "each region is normally used for: most processes declare nothing, while an " +
+                "architecture almost always declares signals first.</html>",
+        ).apply { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND }
 
         val whenCombo = javax.swing.JComboBox(
             javax.swing.DefaultComboBoxModel(arrayOf(true, false)),
@@ -112,6 +134,14 @@ class VhdlSettingsConfigurable : Configurable {
             .addLabeledComponent("Case alternatives:", whenCombo)
             .addComponentToRightColumn(whenNote)
             .addSeparator()
+            .addComponent(JBLabel("Caret after completing a block:"))
+            .addComponentToRightColumn(caretNote)
+            .addLabeledComponent("Architecture:", caretCombo("architecture"))
+            .addLabeledComponent("Process:", caretCombo("process"))
+            .addLabeledComponent("Function or procedure:", caretCombo("subprogram"))
+            .addLabeledComponent("Block:", caretCombo("block"))
+            .addLabeledComponent("Generate:", caretCombo("generate"))
+            .addSeparator()
             .addLabeledComponent("Vivado installation:", pathField)
             .addComponentToRightColumn(pathNote)
             .addComponentFillVertically(javax.swing.JPanel(), 0)
@@ -126,6 +156,7 @@ class VhdlSettingsConfigurable : Configurable {
             completeBlocks?.isSelected != settings.completeBlocks ||
             insertBegin?.isSelected != settings.insertBegin ||
             whenIndent?.selectedItem != settings.indentWhenInCase ||
+            caretSpots.any { (key, box) -> box.selectedItem?.toString() != settings.caretSpot(key) } ||
             (endStyle?.selectedItem as? EndStyle)?.name != settings.endStyle
     }
 
@@ -137,6 +168,9 @@ class VhdlSettingsConfigurable : Configurable {
         settings.completeBlocks = completeBlocks?.isSelected ?: true
         settings.insertBegin = insertBegin?.isSelected ?: true
         settings.indentWhenInCase = whenIndent?.selectedItem as? Boolean ?: true
+        caretSpots.forEach { (key, box) ->
+            (box.selectedItem as? VhdlBlockCompletion.CaretSpot)?.let { settings.setCaretSpot(key, it) }
+        }
         settings.endStyle = (endStyle?.selectedItem as? EndStyle)?.name ?: EndStyle.KEYWORD_AND_NAME.name
         // The proxy is chosen at launch, so the change needs a server restart.
         for (project in ProjectManager.getInstance().openProjects) {
@@ -152,6 +186,11 @@ class VhdlSettingsConfigurable : Configurable {
         completeBlocks?.isSelected = settings.completeBlocks
         insertBegin?.isSelected = settings.insertBegin
         whenIndent?.selectedItem = settings.indentWhenInCase
+        caretSpots.forEach { (key, box) ->
+            box.selectedItem = runCatching {
+                VhdlBlockCompletion.CaretSpot.valueOf(settings.caretSpot(key))
+            }.getOrNull()
+        }
         endStyle?.selectedItem = settings.endStyleEnum
     }
 
@@ -162,6 +201,7 @@ class VhdlSettingsConfigurable : Configurable {
         completeBlocks = null
         insertBegin = null
         whenIndent = null
+        caretSpots.clear()
         endStyle = null
     }
 }

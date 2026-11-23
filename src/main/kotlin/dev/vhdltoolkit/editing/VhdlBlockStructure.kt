@@ -90,6 +90,22 @@ object VhdlBlockStructure {
     }
 
     /** Keywords that may begin a line and should sit at the enclosing header's column. */
+    /** Used when the caller has no tab width to offer. */
+    const val DEFAULT_TAB_SIZE = 4
+
+    /**
+     * An indent of [columns] columns, written the way the file is written.
+     *
+     * This is the counterpart to the column measurement: whatever this
+     * writes must measure back to the same number of columns, or indentation
+     * drifts. Keeping both in one place is what stops them diverging again.
+     */
+    fun renderIndent(columns: Int, useTabs: Boolean, tabSize: Int): String {
+        if (columns <= 0) return ""
+        if (!useTabs || tabSize <= 0) return " ".repeat(columns)
+        return "\t".repeat(columns / tabSize) + " ".repeat(columns % tabSize)
+    }
+
     private val DEDENTING_LINE_STARTS = setOf("end", "begin", "elsif", "else", "when")
 
     /**
@@ -100,7 +116,11 @@ object VhdlBlockStructure {
      * enough for VHDL sources at typing speed; correctness is worth more here
      * than an incremental cache that could drift.
      */
-    fun analyze(text: CharSequence, offset: Int = text.length): State {
+    fun analyze(
+        text: CharSequence,
+        offset: Int = text.length,
+        tabSize: Int = DEFAULT_TAB_SIZE,
+    ): State {
         val tokens = significantTokens(text, offset)
         val frames = ArrayList<Frame>()
         var designUnitStart = 0
@@ -151,7 +171,7 @@ object VhdlBlockStructure {
                     // A new alternative replaces the previous one.
                     if (frames.lastOrNull()?.construct == Construct.WHEN) frames.removeAt(frames.size - 1)
                     if (frames.lastOrNull()?.construct == Construct.CASE) {
-                        frames.add(Frame(Construct.WHEN, null, null, columnOf(text, token.start), token.start))
+                        frames.add(Frame(Construct.WHEN, null, null, columnOf(text, token.start, tabSize), token.start))
                     }
                 }
 
@@ -167,7 +187,7 @@ object VhdlBlockStructure {
                                 construct = opened.first,
                                 name = opened.second,
                                 label = labelBefore(tokens, i),
-                                headerColumn = columnOf(text, lineKeywordStart(tokens, i, text)),
+                                headerColumn = columnOf(text, lineKeywordStart(tokens, i, text), tabSize),
                                 openOffset = token.start,
                             ),
                         )
@@ -193,8 +213,9 @@ object VhdlBlockStructure {
         indentSize: Int,
         lineStartsWith: String? = null,
         indentWhenInCase: Boolean = true,
+        tabSize: Int = DEFAULT_TAB_SIZE,
     ): Int {
-        val state = analyze(text, offset)
+        val state = analyze(text, offset, tabSize)
         val frame = state.innermost ?: return 0
         val word = lineStartsWith?.lowercase()
 
@@ -519,12 +540,30 @@ object VhdlBlockStructure {
         return width
     }
 
-    private fun columnOf(text: CharSequence, offset: Int): Int {
+    /**
+     * The display column at [offset], with tabs expanded to [tabSize].
+     *
+     * Counting characters instead would make a tab one column wide, while
+     * [renderIndent] writes a tab for every [tabSize] columns. Those two
+     * disagreeing is what made indentation drift in a tab-indented file: a
+     * line written at column 8 measured back as column 2, so the next
+     * construct was aligned to a column that was never asked for, and the
+     * error compounded down the file.
+     *
+     * A tab advances to the next multiple of [tabSize], which can only be
+     * worked out by reading forwards from the start of the line.
+     */
+    private fun columnOf(text: CharSequence, offset: Int, tabSize: Int): Int {
+        var lineStart = offset
+        while (lineStart > 0 && text[lineStart - 1] != '\n') lineStart--
+
         var column = 0
-        var i = offset - 1
-        while (i >= 0 && text[i] != '\n') {
-            column++
-            i--
+        for (i in lineStart until offset) {
+            column = if (text[i] == '\t' && tabSize > 0) {
+                (column / tabSize + 1) * tabSize
+            } else {
+                column + 1
+            }
         }
         return column
     }

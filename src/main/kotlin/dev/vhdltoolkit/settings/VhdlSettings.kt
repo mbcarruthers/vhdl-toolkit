@@ -6,6 +6,9 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
+import dev.vhdltoolkit.editing.VhdlBlockCompletion
+import dev.vhdltoolkit.editing.VhdlBlockCompletion.CaretSpot
+import dev.vhdltoolkit.editing.VhdlBlockStructure
 import dev.vhdltoolkit.editing.VhdlBlockStructure.EndStyle
 
 @Service(Service.Level.APP)
@@ -42,6 +45,20 @@ class VhdlSettings : PersistentStateComponent<VhdlSettings> {
      */
     var indentWhenInCase: Boolean = true
 
+    /**
+     * Where the caret lands after a construct that has a `begin` is
+     * completed, one entry per such construct.
+     *
+     * Stored by name so the choice survives a reordering of the enum, and
+     * kept per construct because the right answer differs: most processes
+     * declare nothing, most architectures declare signals.
+     */
+    var caretInArchitecture: String = CaretSpot.DECLARATIVE.name
+    var caretInProcess: String = CaretSpot.BODY.name
+    var caretInSubprogram: String = CaretSpot.BODY.name
+    var caretInBlock: String = CaretSpot.DECLARATIVE.name
+    var caretInGenerate: String = CaretSpot.BODY.name
+
     /** Insert the matching `end` when a block-opening line is completed. */
     var completeBlocks: Boolean = true
 
@@ -63,5 +80,39 @@ class VhdlSettings : PersistentStateComponent<VhdlSettings> {
     companion object {
         fun getInstance(): VhdlSettings =
             ApplicationManager.getApplication().getService(VhdlSettings::class.java)
+    }
+
+    /** The configured spot for [construct], falling back to the default. */
+    fun caretSpotFor(construct: VhdlBlockStructure.Construct): CaretSpot {
+        val stored = when (construct) {
+            VhdlBlockStructure.Construct.ARCHITECTURE -> caretInArchitecture
+            VhdlBlockStructure.Construct.PROCESS -> caretInProcess
+            VhdlBlockStructure.Construct.SUBPROGRAM -> caretInSubprogram
+            VhdlBlockStructure.Construct.BLOCK -> caretInBlock
+            VhdlBlockStructure.Construct.GENERATE -> caretInGenerate
+            else -> return VhdlBlockCompletion.defaultCaretSpot(construct)
+        }
+        return runCatching { CaretSpot.valueOf(stored) }
+            .getOrElse { VhdlBlockCompletion.defaultCaretSpot(construct) }
+    }
+
+    /** The stored spot for a construct, named as the settings page names it. */
+    fun caretSpot(key: String): String = when (key) {
+        "architecture" -> caretInArchitecture
+        "process" -> caretInProcess
+        "subprogram" -> caretInSubprogram
+        "block" -> caretInBlock
+        "generate" -> caretInGenerate
+        else -> CaretSpot.DECLARATIVE.name
+    }
+
+    fun setCaretSpot(key: String, spot: CaretSpot) {
+        when (key) {
+            "architecture" -> caretInArchitecture = spot.name
+            "process" -> caretInProcess = spot.name
+            "subprogram" -> caretInSubprogram = spot.name
+            "block" -> caretInBlock = spot.name
+            "generate" -> caretInGenerate = spot.name
+        }
     }
 }
