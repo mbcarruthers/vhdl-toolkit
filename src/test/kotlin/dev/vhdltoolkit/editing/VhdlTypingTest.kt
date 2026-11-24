@@ -92,4 +92,52 @@ class VhdlTypingTest : BasePlatformTestCase() {
         assertFalse("VHDL is configured for spaces", options.USE_TAB_CHARACTER)
         assertEquals(4, options.INDENT_SIZE)
     }
+
+    // ---------------------------------------------------- completion path
+
+    /**
+     * The gap that let the reported bug through: the suite typed in a way
+     * nobody types. A closing keyword can arrive two ways, and only one of
+     * them went through the typed handler, so five passing tests sat beside
+     * an editor that visibly did not work.
+     *
+     * Accepting the completion has to land in the same column as typing it.
+     */
+    fun testElseLinesUpWhenItsCompletionIsAccepted() {
+        openProcess()
+        myFixture.type("el")
+        val suggestions = myFixture.completeBasic()
+        val item = suggestions?.firstOrNull { it.lookupString.equals("else", ignoreCase = true) }
+        assertNotNull("completion should offer else", item)
+        myFixture.lookup.currentItem = item
+        myFixture.finishLookup('\n')
+        assertEquals("        else", caretLine())
+    }
+
+    fun testEndLinesUpWhenItsCompletionIsAccepted() {
+        openProcess()
+        myFixture.type("en")
+        val suggestions = myFixture.completeBasic()
+        val item = suggestions?.firstOrNull { it.lookupString.equals("end", ignoreCase = true) }
+        assertNotNull("completion should offer end", item)
+        myFixture.lookup.currentItem = item
+        myFixture.finishLookup('\n')
+        assertEquals("        end", caretLine())
+    }
+
+    /**
+     * A skeleton is not a closing keyword and must not be dragged to the
+     * construct's column; it belongs where the author was writing.
+     */
+    fun testAcceptingAnOrdinaryKeywordDoesNotMoveTheLine() {
+        openProcess()
+        myFixture.type("wa")
+        val suggestions = myFixture.completeBasic()
+        val item = suggestions?.firstOrNull { it.lookupString.equals("wait", ignoreCase = true) }
+        if (item != null) {
+            myFixture.lookup.currentItem = item
+            myFixture.finishLookup('\n')
+            assertEquals("            wait", caretLine())
+        }
+    }
 }

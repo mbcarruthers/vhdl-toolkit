@@ -12,6 +12,7 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.util.TextRange
 import com.intellij.patterns.PlatformPatterns
 import dev.vhdltoolkit.VhdlLanguage
+import dev.vhdltoolkit.editing.VhdlLineReindenter
 
 /**
  * Completes VHDL keywords, standard types and block skeletons.
@@ -95,8 +96,30 @@ private class VhdlKeywordProvider : com.intellij.codeInsight.completion.Completi
                 .withPresentableText(suggestion.text)
                 .withTailText("  …", true)
                 .withInsertHandler(TemplateInsertHandler(template))
+        } else if (suggestion.text.lowercase() in VhdlLineReindenter.CLOSING_WORDS) {
+            element = element.withInsertHandler(ReindentInsertHandler)
         }
         return element
+    }
+}
+
+/**
+ * Pulls a closing keyword back to its construct's column once it is inserted.
+ *
+ * Typing `else` is handled as the characters arrive, but accepting it from
+ * the popup inserts the word whole and the typed handler never sees it. The
+ * line then stayed where it was, which read as the indentation being broken
+ * rather than as one path through it being unhandled — and the keyword
+ * completion that introduced the second path is the thing that made it
+ * reachable.
+ */
+private object ReindentInsertHandler : InsertHandler<LookupElement> {
+
+    override fun handleInsert(context: InsertionContext, item: LookupElement) {
+        context.commitDocument()
+        val document = context.document
+        val line = document.getLineNumber(context.tailOffset.coerceIn(0, document.textLength))
+        VhdlLineReindenter.reindentIfClosing(context.project, document, line)
     }
 }
 

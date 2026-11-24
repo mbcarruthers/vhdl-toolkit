@@ -88,7 +88,7 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
         if (typedSoFar.substringBefore(word).isNotBlank()) return Result.CONTINUE
 
         PsiDocumentManager.getInstance(project).commitDocument(document)
-        reindentLine(project, document, lineNumber, word)
+        VhdlLineReindenter.reindent(project, document, lineNumber, word)
         return Result.CONTINUE
     }
 
@@ -116,33 +116,9 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
         editor.caretModel.moveToOffset(caret)
     }
 
-    private fun reindentLine(project: Project, document: Document, lineNumber: Int, firstWord: String) {
-        val indentOptions = runCatching { CodeStyle.getIndentOptions(project, document) }.getOrNull()
-        val indentSize = indentOptions?.INDENT_SIZE?.takeIf { it > 0 } ?: VhdlLineIndentProvider.DEFAULT_INDENT
-        val useTabs = indentOptions?.USE_TAB_CHARACTER ?: false
-        val tabSize = indentOptions?.TAB_SIZE?.takeIf { it > 0 } ?: indentSize
-
-        val lineStart = document.getLineStartOffset(lineNumber)
-        val columns = VhdlBlockStructure.indentFor(
-            text = document.charsSequence,
-            offset = lineStart,
-            indentSize = indentSize,
-            lineStartsWith = firstWord,
-            indentWhenInCase = VhdlSettings.getInstance().indentWhenInCase,
-            tabSize = tabSize,
-        )
-        val wanted = VhdlLineIndentProvider.renderIndent(columns, useTabs, tabSize)
-
-        val lineEnd = document.getLineEndOffset(lineNumber)
-        val lineText = document.getText(com.intellij.openapi.util.TextRange(lineStart, lineEnd))
-        val currentIndent = lineText.takeWhile { it == ' ' || it == '\t' }
-        if (currentIndent == wanted) return
-
-        document.replaceString(lineStart, lineStart + currentIndent.length, wanted)
-    }
-
     private companion object {
-        val REINDENT_TRIGGERS = setOf("end", "begin", "else", "elsif", "when", ")")
+        /** Shared with the completion path, which closes the same words. */
+        val REINDENT_TRIGGERS = VhdlLineReindenter.CLOSING_WORDS
     }
 }
 
