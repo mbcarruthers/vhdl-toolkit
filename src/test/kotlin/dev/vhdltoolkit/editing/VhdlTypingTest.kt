@@ -1,6 +1,8 @@
 package dev.vhdltoolkit.editing
 
 import com.intellij.application.options.CodeStyle
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.util.TextRange
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import dev.vhdltoolkit.VhdlLanguage
@@ -139,5 +141,58 @@ class VhdlTypingTest : BasePlatformTestCase() {
             myFixture.finishLookup('\n')
             assertEquals("            wait", caretLine())
         }
+    }
+
+    // --------------------------------------------------------- enter path
+
+    /** Puts [text] into the document the way a paste or a lookup would. */
+    private fun insertWithoutTyping(text: String) {
+        val editor = myFixture.editor
+        WriteCommandAction.runWriteCommandAction(project) {
+            editor.document.insertString(editor.caretModel.offset, text)
+        }
+        editor.caretModel.moveToOffset(editor.caretModel.offset + text.length)
+    }
+
+    /** The line above the caret, indent included. */
+    private fun lineAboveCaret(): String {
+        val document = myFixture.editor.document
+        val line = document.getLineNumber(myFixture.editor.caretModel.offset) - 1
+        return document.getText(
+            TextRange(document.getLineStartOffset(line), document.getLineEndOffset(line)),
+        )
+    }
+
+    /**
+     * The case neither earlier path reaches. While the completion popup is
+     * open the lookup takes the keystrokes, so the typed handler never sees
+     * the word even though the author typed every letter of it — and nothing
+     * was accepted, so no insert handler runs either. Enter is the only
+     * moment left, and it has to be enough.
+     */
+    fun testAWordThatNeverReachedTheTypedHandlerIsLinedUpOnEnter() {
+        openProcess()
+        insertWithoutTyping("else")
+        myFixture.performEditorAction(IdeActions.ACTION_EDITOR_ENTER)
+        assertEquals("        else", lineAboveCaret())
+    }
+
+    /**
+     * A closer with more than one word on the line. The typed handler cannot
+     * help here at all: by the time the `;` is typed the line reads
+     * `end if;`, which is not a keyword it recognises.
+     */
+    fun testAMultiWordCloserIsLinedUpOnEnter() {
+        openProcess()
+        insertWithoutTyping("end if;")
+        myFixture.performEditorAction(IdeActions.ACTION_EDITOR_ENTER)
+        assertEquals("        end if;", lineAboveCaret())
+    }
+
+    fun testAnOrdinaryStatementIsLeftWhereItWas() {
+        openProcess()
+        insertWithoutTyping("q <= '0';")
+        myFixture.performEditorAction(IdeActions.ACTION_EDITOR_ENTER)
+        assertEquals("            q <= '0';", lineAboveCaret())
     }
 }

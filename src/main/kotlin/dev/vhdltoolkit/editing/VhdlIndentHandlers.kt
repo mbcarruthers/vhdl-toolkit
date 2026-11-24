@@ -140,11 +140,22 @@ class VhdlEnterHandler : EnterHandlerDelegateAdapter() {
         dataContext: DataContext,
     ): EnterHandlerDelegate.Result {
         if (file.language !is VhdlLanguage) return EnterHandlerDelegate.Result.Continue
-        val settings = VhdlSettings.getInstance()
-        if (!settings.completeBlocks) return EnterHandlerDelegate.Result.Continue
 
         val project = file.project
         val document = editor.document
+
+        // Enter is the one moment every route into a line has in common. A
+        // closing keyword can be typed, accepted from the popup or pasted,
+        // and only the first of those reaches the typed handler — and not
+        // even that one while the popup is open, since the lookup takes the
+        // keystrokes first. Lining the finished line up here covers all of
+        // them, and runs whether or not block completion is switched on.
+        lineUpFinishedLine(project, editor, document)
+
+        val settings = VhdlSettings.getInstance()
+        if (!settings.completeBlocks) return EnterHandlerDelegate.Result.Continue
+
+        // Read after the line above, which may have shifted everything.
         val caret = editor.caretModel.offset
 
         val options = runCatching { CodeStyle.getIndentOptions(project, document) }.getOrNull()
@@ -166,5 +177,12 @@ class VhdlEnterHandler : EnterHandlerDelegateAdapter() {
         editor.caretModel.moveToOffset(from + completion.caretOffsetInInsertion)
         PsiDocumentManager.getInstance(project).commitDocument(document)
         return EnterHandlerDelegate.Result.Continue
+    }
+
+    /** Lines up whatever was just finished on the line Enter was pressed from. */
+    private fun lineUpFinishedLine(project: Project, editor: Editor, document: Document) {
+        val line = document.getLineNumber(editor.caretModel.offset)
+        if (line == 0) return
+        VhdlLineReindenter.reindentFinishedLine(project, document, line - 1)
     }
 }

@@ -41,6 +41,30 @@ object VhdlLineReindenter {
         reindent(project, document, lineNumber, word)
     }
 
+    /**
+     * Reindents [lineNumber] when it *begins* with a word that closes a
+     * construct, whatever follows on the rest of the line.
+     *
+     * This is the form Enter uses, and it is deliberately looser than
+     * [reindentIfClosing]: by the time Enter is pressed the line is finished,
+     * so `end if;` and `end process;` should line up as readily as a bare
+     * `end`. It also catches the case the typed handler cannot see at all —
+     * while the completion popup is open the lookup takes the keystrokes and
+     * our handler never runs, so a word typed in full under an open popup
+     * reaches the document without anything having lined it up.
+     */
+    fun reindentFinishedLine(project: Project, document: Document, lineNumber: Int) {
+        val lineStart = document.getLineStartOffset(lineNumber)
+        val lineEnd = document.getLineEndOffset(lineNumber)
+        val content = document.getText(TextRange(lineStart, lineEnd)).trim()
+        if (content.isEmpty()) return
+
+        val first = content.takeWhile { !it.isWhitespace() }.trimEnd(';').lowercase()
+        if (first !in CLOSING_WORDS) return
+
+        reindent(project, document, lineNumber, first)
+    }
+
     /** Reindents [lineNumber], aligning it as a line that starts with [firstWord]. */
     fun reindent(project: Project, document: Document, lineNumber: Int, firstWord: String?) {
         val options = runCatching { CodeStyle.getIndentOptions(project, document) }.getOrNull()
