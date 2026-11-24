@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
 plugins {
@@ -19,7 +20,14 @@ repositories {
 dependencies {
     intellijPlatform {
         clion("2024.2.4")
+        // Spike question 3: does a real editor fixture start against a
+        // CLion target? The logic is covered in :core; what is untested is
+        // everything that only exists once the IDE is running.
+        testFramework(TestFrameworkType.Platform)
     }
+    // The logic half. Bundled into the plugin jar; see the verification in
+    // the spike notes that its classes actually land in the distribution.
+    implementation(project(":core"))
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -45,5 +53,17 @@ intellijPlatform {
 tasks.withType<PrepareSandboxTask> {
     from(layout.projectDirectory.dir("bundled")) {
         into("${intellijPlatform.pluginConfiguration.name.get()}/vhdl_ls")
+    }
+}
+
+// Failure detail in the CI log. Without this a ComparisonFailure prints only
+// its file and line, and the expected/actual values are reachable only by
+// downloading the HTML report.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("passed", "failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
     }
 }

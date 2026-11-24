@@ -57,7 +57,7 @@ object VhdlSmartEnter {
             .append(text, 0, lineStart)
             .append(fixed)
             .append('\n')
-        val nextIndent = VhdlLineIndentProvider.renderIndent(
+        val nextIndent = VhdlBlockStructure.renderIndent(
             VhdlBlockStructure.indentFor(repaired, repaired.length, indentSize),
             useTabs = indent.startsWith("\t"),
             tabSize = indentSize,

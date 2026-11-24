@@ -36,7 +36,11 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.lsp</depends>
+    <!-- The language server needs this module, and nothing else does.
+         Declared optional so that an IDE without it loses diagnostics and
+         go-to-definition rather than the whole plugin: a hard dependency
+         here took highlighting, indentation and completion down with it. -->
+    <depends optional="true" config-file="vhdl-lsp.xml">com.intellij.modules.lsp</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
@@ -85,8 +89,6 @@
             implementationClass="dev.vhdltoolkit.completion.VhdlCompletionContributor"/>
         <colorSettingsPage
             implementation="dev.vhdltoolkit.highlight.VhdlColorSettingsPage"/>
-        <platform.lsp.serverSupportProvider
-            implementation="dev.vhdltoolkit.lsp.VhdlLspServerSupportProvider"/>
         <notificationGroup
             id="VHDL Toolkit"
             displayType="BALLOON"/>

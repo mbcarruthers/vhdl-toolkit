@@ -1,6 +1,7 @@
 package dev.vhdltoolkit.project
 
 import com.intellij.util.EnvironmentUtil
+import dev.vhdltoolkit.run.VivadoExecutable
 import dev.vhdltoolkit.settings.VhdlSettings
 import java.nio.file.Path
 
@@ -25,6 +26,10 @@ object VivadoLocator {
 
     private fun shellEnv(name: String): String? =
         EnvironmentUtil.getValue(name) ?: System.getenv(name)
+
+    /** The `vivado` launcher of whichever installation applies. */
+    fun executable(preferredVersion: String? = null): Path? =
+        install(preferredVersion)?.let { VivadoExecutable.forInstall(it) }
 
     /** A message that names every way to fix "Vivado not found". */
     fun notFoundMessage(): String =
