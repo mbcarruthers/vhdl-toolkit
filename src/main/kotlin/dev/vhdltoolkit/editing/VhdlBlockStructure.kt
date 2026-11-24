@@ -315,8 +315,15 @@ object VhdlBlockStructure {
      * second one should not be inserted while editing existing code.
      */
     fun isClosedAfter(text: CharSequence, frame: Frame, offset: Int): Boolean {
+        // Matching on the keyword alone cannot separate two constructs of
+        // the same kind. Inside `if x then / if y then`, the outer `end if;`
+        // answers "yes, an if ends here" for the inner one too, so the inner
+        // never gets completed. What settles it is counting: as many closers
+        // must follow as there are constructs of this kind still open.
+        val stillOpen = analyze(text, offset).frames.count { it.construct == frame.construct }
         val tokens = significantTokens(text, text.length).filter { it.start >= offset }
         var depth = 0
+        var closers = 0
 
         for ((index, token) in tokens.withIndex()) {
             if (token.kind != VhdlTokenizer.Kind.KEYWORD) continue
@@ -326,12 +333,15 @@ object VhdlBlockStructure {
                         depth--
                         continue
                     }
-                    // The first unmatched `end` either closes this frame or
-                    // an enclosing one. Which it is matters: in a real file
-                    // there is nearly always an `end process;` or
-                    // `end architecture;` further down, and treating that as
-                    // proof of closure means never completing anything.
-                    return endBelongsTo(frame, tokens.getOrNull(index + 1))
+                    // An unmatched `end` closes either this kind of
+                    // construct or an enclosing one. Once an enclosing one
+                    // is reached, nothing further down can belong to this
+                    // frame: in a real file there is nearly always an
+                    // `end process;` or `end architecture;` below, and
+                    // treating those as proof of closure would mean never
+                    // completing anything.
+                    if (!endBelongsTo(frame, tokens.getOrNull(index + 1))) return false
+                    if (++closers >= stillOpen) return true
                 }
 
                 token.lower in OPENING_KEYWORDS -> depth++
