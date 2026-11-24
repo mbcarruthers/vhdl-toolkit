@@ -80,13 +80,28 @@ class VhdlNestedBlockTest {
         assertEquals(2, Regex("""\bend\s+loop\s*;""").findAll(result!!).count())
     }
 
+    /**
+     * Completion fires on the line that opens a block, so the caret sits
+     * just after `inner : block` — not after its `begin`, where nothing has
+     * been opened and there is correctly nothing to do.
+     */
     @Test
-    fun aNestedProcessIsNotAThingButANestedBlockIs() {
+    fun aNestedBlockGetsItsOwnEnd() {
         val result = complete(
             "architecture a of b is\nbegin\n    outer : block\n    begin\n" +
-                "        inner : block\n        begin\n            |\n    end block outer;\n",
+                "        inner : block\n            |\n    end block outer;\n",
         )
         assertEquals(2, Regex("""\bend\s+block""").findAll(result!!).count())
+    }
+
+    @Test
+    fun nothingHappensAfterABeginBecauseNothingWasOpened() {
+        assertNull(
+            complete(
+                "architecture a of b is\nbegin\n    outer : block\n    begin\n" +
+                    "        inner : block\n        begin\n            |\n    end block outer;\n",
+            ),
+        )
     }
 
     // ------------------------------------- what must keep working as before

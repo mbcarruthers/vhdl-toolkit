@@ -324,11 +324,20 @@ object VhdlBlockStructure {
         val tokens = significantTokens(text, text.length).filter { it.start >= offset }
         var depth = 0
         var closers = 0
+        // `end if`, `end loop`, `end block` name the construct they close
+        // with the same keyword that opens one, so the word after an `end`
+        // has to be stepped over or every closer counts as another opener.
+        var afterEnd = false
 
         for ((index, token) in tokens.withIndex()) {
             if (token.kind != VhdlTokenizer.Kind.KEYWORD) continue
+            if (afterEnd) {
+                afterEnd = false
+                if (token.lower != "end") continue
+            }
             when {
                 token.lower == "end" -> {
+                    afterEnd = true
                     if (depth > 0) {
                         depth--
                         continue
