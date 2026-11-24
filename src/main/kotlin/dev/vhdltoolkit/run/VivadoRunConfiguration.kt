@@ -19,6 +19,7 @@ import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IconLoader
 import dev.vhdltoolkit.project.VivadoInstall
+import dev.vhdltoolkit.project.VivadoLocator
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.Icon
@@ -78,7 +79,7 @@ class VivadoRunConfiguration(
         if (!Path.of(xpr).isRegularFile()) {
             throw RuntimeConfigurationError("Project file does not exist: $xpr")
         }
-        if (VivadoExecutable.find(VivadoInstall.versionFromXpr(Path.of(xpr))) == null) {
+        if (VivadoLocator.executable(VivadoInstall.versionFromXpr(Path.of(xpr))) == null) {
             throw RuntimeConfigurationError(
                 "No Vivado installation found. Set XILINX_VIVADO to the installation directory.",
             )
@@ -105,7 +106,7 @@ private class VivadoCommandLineState(
 
     override fun startProcess(): ProcessHandler {
         val version = VivadoInstall.versionFromXpr(xpr)
-        val vivado = VivadoExecutable.find(version)
+        val vivado = VivadoLocator.executable(version)
             ?: throw IllegalStateException("No Vivado installation found")
 
         val script = Files.createTempFile("vhdl-toolkit-", ".tcl").apply {

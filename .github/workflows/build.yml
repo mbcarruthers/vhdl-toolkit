@@ -23,6 +23,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The logic half carries no IDE on its classpath. Run first so a
+      # failure here is unambiguous about which layer broke.
+      - name: Test core (no IntelliJ dependency)
+        run: ./gradlew --no-daemon :core:test
+
       - name: Test and build
         run: ./gradlew --no-daemon test buildPlugin
 

@@ -9,7 +9,6 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import dev.vhdltoolkit.run.VivadoExecutable
 import java.nio.file.Path
 
 /**
@@ -55,7 +54,7 @@ object GenerateProjectFromTcl {
     }
 
     private fun execute(project: Project, source: VhdlMappingService.Source.TclScript) {
-        val vivado = VivadoExecutable.find()
+        val vivado = VivadoLocator.executable()
         if (vivado == null) {
             notify(project, "Cannot run ${source.file.fileName}", VivadoLocator.notFoundMessage(), NotificationType.WARNING)
             return

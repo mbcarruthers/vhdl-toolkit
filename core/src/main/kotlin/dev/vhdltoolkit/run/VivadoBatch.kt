@@ -1,6 +1,5 @@
 package dev.vhdltoolkit.run
 
-import dev.vhdltoolkit.project.VivadoLocator
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
 
@@ -82,13 +81,13 @@ object VivadoTcl {
         if (value.none { it in "{}\\" }) "{$value}" else "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
-/** Finds the `vivado` launcher inside an installation. */
+/**
+ * Finds the `vivado` launcher inside an installation.
+ *
+ * Which installation is a question for the IDE side, where the setting and
+ * the user's shell environment live; see `VivadoLocator.executable`.
+ */
 object VivadoExecutable {
-
-    fun find(preferredVersion: String? = null): Path? {
-        val install = VivadoLocator.install(preferredVersion) ?: return null
-        return forInstall(install)
-    }
 
     fun forInstall(install: Path): Path? {
         val candidates = listOf("bin/vivado", "bin/vivado.bat")
