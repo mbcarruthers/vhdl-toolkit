@@ -43,6 +43,7 @@ class VhdlLineIndentProvider : LineIndentProvider {
             indentSize = indentSize,
             lineStartsWith = null,
             indentWhenInCase = VhdlSettings.getInstance().indentWhenInCase,
+            tabSize = tabSize,
         )
         return renderIndent(columns, useTabs, tabSize)
     }
@@ -50,11 +51,9 @@ class VhdlLineIndentProvider : LineIndentProvider {
     companion object {
         const val DEFAULT_INDENT = 4
 
-        fun renderIndent(columns: Int, useTabs: Boolean, tabSize: Int): String {
-            if (columns <= 0) return ""
-            if (!useTabs || tabSize <= 0) return " ".repeat(columns)
-            return "\t".repeat(columns / tabSize) + " ".repeat(columns % tabSize)
-        }
+        /** Kept as the editor-side name for [VhdlBlockStructure.renderIndent]. */
+        fun renderIndent(columns: Int, useTabs: Boolean, tabSize: Int): String =
+            VhdlBlockStructure.renderIndent(columns, useTabs, tabSize)
     }
 }
 
@@ -130,6 +129,7 @@ class VhdlTypedHandler : TypedHandlerDelegate() {
             indentSize = indentSize,
             lineStartsWith = firstWord,
             indentWhenInCase = VhdlSettings.getInstance().indentWhenInCase,
+            tabSize = tabSize,
         )
         val wanted = VhdlLineIndentProvider.renderIndent(columns, useTabs, tabSize)
 
@@ -171,21 +171,24 @@ class VhdlEnterHandler : EnterHandlerDelegateAdapter() {
         val document = editor.document
         val caret = editor.caretModel.offset
 
+        val options = runCatching { CodeStyle.getIndentOptions(project, document) }.getOrNull()
+        val indentSize = options?.INDENT_SIZE?.takeIf { it > 0 } ?: VhdlLineIndentProvider.DEFAULT_INDENT
+
         val completion = VhdlBlockCompletion.completionAt(
             text = document.charsSequence,
             caret = caret,
-            indentSize = indentSize(project, document),
+            indentSize = indentSize,
             endStyle = settings.endStyleEnum,
             insertBegin = settings.insertBegin,
+            useTabs = options?.USE_TAB_CHARACTER ?: false,
+            tabSize = options?.TAB_SIZE?.takeIf { it > 0 } ?: indentSize,
+            caretSpot = settings::caretSpotFor,
         ) ?: return EnterHandlerDelegate.Result.Continue
 
-        document.insertString(caret, completion.textToInsert)
-        editor.caretModel.moveToOffset(caret + completion.caretOffsetInInsertion)
+        val from = caret - completion.replaceBefore
+        document.replaceString(from, caret, completion.textToInsert)
+        editor.caretModel.moveToOffset(from + completion.caretOffsetInInsertion)
         PsiDocumentManager.getInstance(project).commitDocument(document)
         return EnterHandlerDelegate.Result.Continue
     }
-
-    private fun indentSize(project: Project, document: Document): Int =
-        runCatching { CodeStyle.getIndentOptions(project, document).INDENT_SIZE }
-            .getOrNull()?.takeIf { it > 0 } ?: VhdlLineIndentProvider.DEFAULT_INDENT
 }

@@ -21,7 +21,9 @@ class VhdlBlockCompletionTest {
         val text = marked.removeRange(caret, caret + 1)
         val completion = VhdlBlockCompletion.completionAt(text, caret, 4, style, insertBegin)
             ?: return null
-        return text.substring(0, caret) + completion.textToInsert + text.substring(caret)
+        return text.substring(0, caret - completion.replaceBefore) +
+            completion.textToInsert +
+            text.substring(caret)
     }
 
     @Test
@@ -32,10 +34,15 @@ class VhdlBlockCompletionTest {
         )
     }
 
+    /**
+     * A process defaults to leaving the caret in the body, because most
+     * processes declare nothing. `begin` therefore goes above the caret's
+     * line, replacing the indent that line already carried.
+     */
     @Test
     fun processGetsBeginAndEndAtItsOwnColumn() {
         assertEquals(
-            "architecture a of b is\nbegin\n    process (clk)\n        \n    begin\n    end process;",
+            "architecture a of b is\nbegin\n    process (clk)\n    begin\n        \n    end process;",
             complete("architecture a of b is\nbegin\n    process (clk)\n        |"),
         )
     }

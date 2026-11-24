@@ -90,6 +90,22 @@ object VhdlBlockStructure {
     }
 
     /** Keywords that may begin a line and should sit at the enclosing header's column. */
+    /** Used when the caller has no tab width to offer. */
+    const val DEFAULT_TAB_SIZE = 4
+
+    /**
+     * An indent of [columns] columns, written the way the file is written.
+     *
+     * This is the counterpart to the column measurement: whatever this
+     * writes must measure back to the same number of columns, or indentation
+     * drifts. Keeping both in one place is what stops them diverging again.
+     */
+    fun renderIndent(columns: Int, useTabs: Boolean, tabSize: Int): String {
+        if (columns <= 0) return ""
+        if (!useTabs || tabSize <= 0) return " ".repeat(columns)
+        return "\t".repeat(columns / tabSize) + " ".repeat(columns % tabSize)
+    }
+
     private val DEDENTING_LINE_STARTS = setOf("end", "begin", "elsif", "else", "when")
 
     /**
@@ -100,7 +116,11 @@ object VhdlBlockStructure {
      * enough for VHDL sources at typing speed; correctness is worth more here
      * than an incremental cache that could drift.
      */
-    fun analyze(text: CharSequence, offset: Int = text.length): State {
+    fun analyze(
+        text: CharSequence,
+        offset: Int = text.length,
+        tabSize: Int = DEFAULT_TAB_SIZE,
+    ): State {
         val tokens = significantTokens(text, offset)
         val frames = ArrayList<Frame>()
         var designUnitStart = 0
@@ -151,7 +171,7 @@ object VhdlBlockStructure {
                     // A new alternative replaces the previous one.
                     if (frames.lastOrNull()?.construct == Construct.WHEN) frames.removeAt(frames.size - 1)
                     if (frames.lastOrNull()?.construct == Construct.CASE) {
-                        frames.add(Frame(Construct.WHEN, null, null, columnOf(text, token.start), token.start))
+                        frames.add(Frame(Construct.WHEN, null, null, columnOf(text, token.start, tabSize), token.start))
                     }
                 }
 
@@ -167,7 +187,7 @@ object VhdlBlockStructure {
                                 construct = opened.first,
                                 name = opened.second,
                                 label = labelBefore(tokens, i),
-                                headerColumn = columnOf(text, lineKeywordStart(tokens, i, text)),
+                                headerColumn = columnOf(text, lineKeywordStart(tokens, i, text), tabSize),
                                 openOffset = token.start,
                             ),
                         )
@@ -193,8 +213,9 @@ object VhdlBlockStructure {
         indentSize: Int,
         lineStartsWith: String? = null,
         indentWhenInCase: Boolean = true,
+        tabSize: Int = DEFAULT_TAB_SIZE,
     ): Int {
-        val state = analyze(text, offset)
+        val state = analyze(text, offset, tabSize)
         val frame = state.innermost ?: return 0
         val word = lineStartsWith?.lowercase()
 
@@ -294,23 +315,42 @@ object VhdlBlockStructure {
      * second one should not be inserted while editing existing code.
      */
     fun isClosedAfter(text: CharSequence, frame: Frame, offset: Int): Boolean {
+        // Matching on the keyword alone cannot separate two constructs of
+        // the same kind. Inside `if x then / if y then`, the outer `end if;`
+        // answers "yes, an if ends here" for the inner one too, so the inner
+        // never gets completed. What settles it is counting: as many closers
+        // must follow as there are constructs of this kind still open.
+        val stillOpen = analyze(text, offset).frames.count { it.construct == frame.construct }
         val tokens = significantTokens(text, text.length).filter { it.start >= offset }
         var depth = 0
+        var closers = 0
+        // `end if`, `end loop`, `end block` name the construct they close
+        // with the same keyword that opens one, so the word after an `end`
+        // has to be stepped over or every closer counts as another opener.
+        var afterEnd = false
 
         for ((index, token) in tokens.withIndex()) {
             if (token.kind != VhdlTokenizer.Kind.KEYWORD) continue
+            if (afterEnd) {
+                afterEnd = false
+                if (token.lower != "end") continue
+            }
             when {
                 token.lower == "end" -> {
+                    afterEnd = true
                     if (depth > 0) {
                         depth--
                         continue
                     }
-                    // The first unmatched `end` either closes this frame or
-                    // an enclosing one. Which it is matters: in a real file
-                    // there is nearly always an `end process;` or
-                    // `end architecture;` further down, and treating that as
-                    // proof of closure means never completing anything.
-                    return endBelongsTo(frame, tokens.getOrNull(index + 1))
+                    // An unmatched `end` closes either this kind of
+                    // construct or an enclosing one. Once an enclosing one
+                    // is reached, nothing further down can belong to this
+                    // frame: in a real file there is nearly always an
+                    // `end process;` or `end architecture;` below, and
+                    // treating those as proof of closure would mean never
+                    // completing anything.
+                    if (!endBelongsTo(frame, tokens.getOrNull(index + 1))) return false
+                    if (++closers >= stillOpen) return true
                 }
 
                 token.lower in OPENING_KEYWORDS -> depth++
@@ -519,12 +559,30 @@ object VhdlBlockStructure {
         return width
     }
 
-    private fun columnOf(text: CharSequence, offset: Int): Int {
+    /**
+     * The display column at [offset], with tabs expanded to [tabSize].
+     *
+     * Counting characters instead would make a tab one column wide, while
+     * [renderIndent] writes a tab for every [tabSize] columns. Those two
+     * disagreeing is what made indentation drift in a tab-indented file: a
+     * line written at column 8 measured back as column 2, so the next
+     * construct was aligned to a column that was never asked for, and the
+     * error compounded down the file.
+     *
+     * A tab advances to the next multiple of [tabSize], which can only be
+     * worked out by reading forwards from the start of the line.
+     */
+    private fun columnOf(text: CharSequence, offset: Int, tabSize: Int): Int {
+        var lineStart = offset
+        while (lineStart > 0 && text[lineStart - 1] != '\n') lineStart--
+
         var column = 0
-        var i = offset - 1
-        while (i >= 0 && text[i] != '\n') {
-            column++
-            i--
+        for (i in lineStart until offset) {
+            column = if (text[i] == '\t' && tabSize > 0) {
+                (column / tabSize + 1) * tabSize
+            } else {
+                column + 1
+            }
         }
         return column
     }
