@@ -15,8 +15,8 @@ subscription.
 - Block completion: finish a header and the `begin` and matching `end` appear
 - Complete Statement with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd>
 - `port (`, `generic (` and `port map (` close with their semicolon
-- Keyword completion by region, with skeletons for entities, architectures,
-  processes, if and case statements
+- Keyword completion by region, with standard types and skeletons for
+  entities, architectures, processes, if and case statements
 - Gutter icons between an entity and its architectures, and from an
   instantiation to what it names
 - Comment/uncomment, bracket matching
@@ -31,6 +31,8 @@ subscription.
 
 - Reads Vivado `.xpr`, Sigasi library mappings, Tcl project scripts, `.f` file
   lists, or falls back to scanning for sources
+- Runs a project-creating Tcl script through Vivado and imports what it
+  produces, for repositories that ship a build script instead of a project
 - Generates `vhdl_ls.toml` and keeps it in step
 - Keeps multi-library projects multi-library: each source keeps the library it
   was assigned, rather than everything landing in one
@@ -39,6 +41,8 @@ subscription.
   information or a project whose vendor libraries are unmapped
 - Maps vendor libraries (`unisim`, `unimacro`, `xpm`) from the Vivado install
 - Spots a stale `~/.vhdl_ls.toml` left behind by another tool
+- Restarts the language server when the mapping changes, so a regenerated
+  `vhdl_ls.toml` takes effect without restarting the IDE
 - Runs Vivado synthesis, implementation and bitstream generation from the IDE,
   with clickable errors
 
@@ -55,6 +59,9 @@ subscription.
 3. **Settings | Plugins | ⚙ | Install Plugin from Disk…** → select the inner
    zip, not its contents and not the `.jar` inside it.
 4. Restart.
+
+The language server is bundled for Linux and Windows x86_64, so there is
+nothing else to install. Other platforms fall back to `vhdl_ls` on `PATH`.
 
 Diagnostics and navigation need an IDE with the LSP API — CLion, IDEA
 Ultimate, PyCharm Professional and so on. In Community editions the plugin
@@ -83,7 +90,9 @@ diagnostic delay, closing style (`end;` / `end if;` / `end if my_label;`),
 where the caret lands after a block is completed, `when` alignment in a case,
 and the Vivado path.
 
-Colours live under **Settings | Editor | Color Scheme | VHDL**.
+Indent size, tabs and `.editorconfig` support live under
+**Settings | Editor | Code Style | VHDL**, and colours under
+**Settings | Editor | Color Scheme | VHDL**.
 
 ## Build from source
 
