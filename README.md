@@ -32,6 +32,11 @@ subscription.
 - Reads Vivado `.xpr`, Sigasi library mappings, Tcl project scripts, `.f` file
   lists, or falls back to scanning for sources
 - Generates `vhdl_ls.toml` and keeps it in step
+- Keeps multi-library projects multi-library: each source keeps the library it
+  was assigned, rather than everything landing in one
+- Reads the sources for the libraries they actually reference and warns when
+  the mapping does not define one, which catches a `.f` list with no library
+  information or a project whose vendor libraries are unmapped
 - Maps vendor libraries (`unisim`, `unimacro`, `xpm`) from the Vivado install
 - Spots a stale `~/.vhdl_ls.toml` left behind by another tool
 - Runs Vivado synthesis, implementation and bitstream generation from the IDE,
