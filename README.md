@@ -99,14 +99,25 @@ bash scripts/fetch-vhdl-ls.sh   # stage VHDL-LS binaries into bundled/
 
 Requires JDK 21. CI does this on every push and uploads the result.
 
+## Layout
+
+`core` holds everything that does not need an IDE: the tokenizer, block
+structure, diagnostics analysis and the project file readers. It has no
+IntelliJ dependency, so reaching into the platform from there fails to compile
+rather than surfacing as a null at runtime, and its tests run without
+downloading an IDE. `src` holds the half that only exists once the editor is
+running, and depends on `core`.
+
 ## Roadmap
 
-- Vendor libraries (`unisim`, `unimacro`, `xpm`) mapped from the Vivado install
-  so designs using Xilinx primitives resolve
-- Smart `end` insertion — typing `architecture rtl of top is` and pressing
-  Enter completes the block, the way `};` works in C++
-- Running synthesis and simulation from the IDE, with clickable errors from the
-  Vivado log
+- Aligning `:` and `=>` into columns in interface lists, port maps and
+  consecutive declarations
+- Quick fixes: adding a missing context clause, converting an operand whose
+  type does not match
+- Checks the language server does not make, starting with incomplete process
+  sensitivity lists
+- Code folding over comment runs and design units
+- Running simulation from the IDE — GHDL first, then waveforms, then cocotb
 - Publishing to the JetBrains Marketplace
 
 Longer term, the cascade collapsing here is a workaround. The real fix is
