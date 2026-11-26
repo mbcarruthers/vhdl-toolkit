@@ -339,4 +339,78 @@ class VhdlAlignmentTest {
             out.joinToString("\n"),
         )
     }
+
+    // ------------------------------------------------------- port modes
+
+    /**
+     * With the modes ragged the types behind them never line up, which is
+     * most of what makes a port clause look unfinished.
+     */
+    @Test
+    fun portModesGetAColumnOfTheirOwn() {
+        assertEquals(
+            """
+            port (
+                clk   : in    std_logic;
+                q     : out   std_logic_vector(3 downto 0);
+                bidir : inout std_logic
+            );
+            """.trimIndent(),
+            align(
+                """
+                port (
+                    |clk : in std_logic;
+                    q : out std_logic_vector(3 downto 0);
+                    bidir : inout std_logic
+                );
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun bufferAndLinkageAreModesToo() {
+        val result = align(
+            """
+            |a : buffer  std_logic;
+            b : linkage std_logic;
+            c : in      std_logic;
+            """,
+        )
+        assertEquals(
+            """
+            a : buffer  std_logic;
+            b : linkage std_logic;
+            c : in      std_logic;
+            """.trimIndent(),
+            result,
+        )
+    }
+
+    /**
+     * A mode is a column, so a line without one has a different shape. The
+     * run stops rather than inventing a column that is not there.
+     */
+    @Test
+    fun aDeclarationWithNoModeDoesNotJoinPorts() {
+        val result = align(
+            """
+            |signal aa : std_logic;
+            clk : in std_logic;
+            """,
+        )
+        assertEquals("signal aa : std_logic;\nclk : in std_logic;", result)
+    }
+
+    /** `in` names a mode only after a colon; elsewhere it is ordinary text. */
+    @Test
+    fun theWordInsideARangeIsNotAMode() {
+        val result = align(
+            """
+            |x    <= a;
+            yyyy <= b;
+            """,
+        )
+        assertEquals("x    <= a;\nyyyy <= b;", result)
+    }
 }

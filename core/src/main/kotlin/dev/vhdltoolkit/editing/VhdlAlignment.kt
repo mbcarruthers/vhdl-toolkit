@@ -30,10 +30,15 @@ import dev.vhdltoolkit.lexer.VhdlTokenizer
 object VhdlAlignment {
 
     /**
-     * An anchor and the text leading up to it. The text is trimmed: the
-     * spacing around an anchor is this object's to decide, not the author's.
+     * A column's worth of a line: the text, trimmed, and the token that ends
+     * it. The spacing around that token is this object's to decide, not the
+     * author's.
+     *
+     * [anchor] is null for a column that is padded but separated by nothing —
+     * a port's mode, which wants a column of its own without a symbol between
+     * it and the type that follows.
      */
-    data class Cell(val content: String, val anchor: String)
+    data class Cell(val content: String, val anchor: String?)
 
     /**
      * One line, read as cells. [tail] is whatever follows the last anchor and
@@ -48,7 +53,7 @@ object VhdlAlignment {
         val raw: String,
     ) {
         /** Two rows belong to the same run when their shapes match. */
-        val shape: List<String> get() = cells.map { it.anchor }
+        val shape: List<String> get() = cells.map { it.anchor ?: BARE_COLUMN }
     }
 
     /** A line to replace, and what to replace it with. */
@@ -58,6 +63,19 @@ object VhdlAlignment {
     const val COMMENT_ANCHOR = "--"
 
     private val OPERATOR_ANCHORS = setOf(":", ":=", "<=", "=>")
+
+    /**
+     * Port modes. A mode is not a separator, but it reads as a column: with
+     * `in`, `out` and `inout` ragged, the types behind them never line up,
+     * which is most of what makes a port clause look unfinished. `buffer`
+     * and `linkage` are here for the same reason — a port using one would
+     * otherwise be the single line that refuses to join its neighbours.
+     */
+    private val MODES = setOf("in", "out", "inout", "buffer", "linkage")
+
+    /** Stands in for a padded column with no separator, when comparing shapes. */
+    private const val BARE_COLUMN = "\u0000mode"
+
 
     /**
      * A trailing comment reads better set further off than an operator does,
@@ -128,8 +146,15 @@ object VhdlAlignment {
         append(row.indent)
         row.cells.forEachIndexed { index, cell ->
             append(cell.content)
-            val padding = widths[index] - displayWidth(cell.content, tabSize)
-            repeat(padding) { append(' ') }
+            repeat(widths[index] - displayWidth(cell.content, tabSize)) { append(' ') }
+
+            if (cell.anchor == null) {
+                // Nothing separates a mode from its type but the gap that
+                // squares the column.
+                append(' ')
+                return@forEachIndexed
+            }
+
             // A cell with no content carries no separator before its anchor,
             // which keeps `y <= a;` from becoming ` y <= a;`.
             if (cell.content.isNotEmpty()) {
@@ -184,8 +209,15 @@ object VhdlAlignment {
         var cellStart = indent.length
         var depth = 0
 
-        for (token in VhdlTokenizer.tokenize(text)) {
+        // Indexed rather than streamed, because a mode is recognised by what
+        // follows the colon and so needs a look ahead.
+        val tokens = VhdlTokenizer.tokenize(text).toList()
+
+        var i = 0
+        while (i < tokens.size) {
+            val token = tokens[i]
             val value = text.substring(token.start, token.end)
+
             when {
                 token.kind == VhdlTokenizer.Kind.LPAREN -> depth++
                 token.kind == VhdlTokenizer.Kind.RPAREN -> depth--
@@ -198,6 +230,16 @@ object VhdlAlignment {
                 token.kind == VhdlTokenizer.Kind.OPERATOR && value in OPERATOR_ANCHORS -> {
                     cells += Cell(text.substring(cellStart, token.start).trim(), value)
                     cellStart = token.end
+
+                    if (value == ":") {
+                        val mode = tokens.drop(i + 1).firstOrNull { it.kind != VhdlTokenizer.Kind.WHITESPACE }
+                        val word = mode?.let { text.substring(it.start, it.end) }
+                        if (word != null && word.lowercase() in MODES) {
+                            cells += Cell(word, null)
+                            cellStart = mode.end
+                            i = tokens.indexOf(mode)
+                        }
+                    }
                 }
 
                 token.kind == VhdlTokenizer.Kind.LINE_COMMENT -> {
@@ -208,6 +250,7 @@ object VhdlAlignment {
 
                 else -> Unit
             }
+            i++
         }
 
         if (cells.isEmpty()) return null
