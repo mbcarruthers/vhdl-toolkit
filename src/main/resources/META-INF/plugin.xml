@@ -79,6 +79,11 @@
         <codeInsight.lineMarkerProvider
             language="VHDL"
             implementationClass="dev.vhdltoolkit.navigation.VhdlLineMarkerProvider"/>
+        <!-- Reformat Code has no formatting model to run through, there
+             being no VHDL parser. A post-format processor is the way to give
+             the shortcut something to do. -->
+        <postFormatProcessor
+            implementation="dev.vhdltoolkit.editing.VhdlPostFormatProcessor"/>
         <langCodeStyleSettingsProvider
             implementation="dev.vhdltoolkit.editing.VhdlCodeStyleSettingsProvider"/>
 
@@ -125,6 +130,14 @@
     </extensions>
 
     <actions>
+        <action
+            id="dev.vhdltoolkit.AlignColumns"
+            class="dev.vhdltoolkit.editing.VhdlAlignAction"
+            text="Align VHDL Columns"
+            description="Line up declarations, associations and assignments into columns">
+            <add-to-group group-id="CodeFormatGroup" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt A"/>
+        </action>
         <action
             id="dev.vhdltoolkit.SyncVhdlMapping"
             class="dev.vhdltoolkit.project.SyncVhdlMappingAction"
