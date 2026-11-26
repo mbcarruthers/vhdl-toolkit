@@ -284,15 +284,26 @@ class VhdlAlignmentTest {
         assertTrue(VhdlAlignment.alignAround(text, 0).isEmpty())
     }
 
+    /**
+     * Padding is interior: it goes between a cell and its anchor, never in
+     * front of the line. Built without trimIndent, which would strip the
+     * very thing being checked.
+     */
     @Test
-    fun indentationIsPreserved() {
-        val result = align(
-            """
-                    |clk : in std_logic;
-                    reset_n : in std_logic;
-            """,
-        )
-        assertTrue("indent kept", result.lines().all { it.startsWith("        ") })
+    fun theLeadingIndentIsUntouched() {
+        val text = "\t\tclk : in std_logic;\n\t\treset_n : in std_logic;"
+        val edits = VhdlAlignment.alignAround(text, 0)
+        assertEquals(1, edits.size)
+        assertEquals("\t\tclk     : in std_logic;", edits.single().text)
+    }
+
+    /** A tab counts as its width when measuring, not as one character. */
+    @Test
+    fun aTabInsideACellIsMeasuredAsDisplayed() {
+        val text = "signal\ta : std_logic;\nsignal bbbbbbbbb : std_logic;"
+        val edits = VhdlAlignment.alignAround(text, 0, tabSize = 4)
+        // `signal` is 6 wide, the tab carries to 8, then `a` ends the cell at 9.
+        assertEquals("signal\ta        : std_logic;", edits.first { it.line == 0 }.text)
     }
 
     @Test
